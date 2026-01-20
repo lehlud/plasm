@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'ast/ast.dart';
 import 'parser/lexer.dart';
 import 'parser/parser.dart';
 import 'analysis/name_analysis.dart';
@@ -7,13 +6,15 @@ import 'analysis/type_analysis.dart';
 import 'ir/ir_builder.dart';
 import 'ir/visitor.dart';
 import 'codegen/wat_generator.dart';
+import 'codegen/wat_generator_gc.dart';
 
 /// Compiler pipeline orchestration
 class Compiler {
   final List<String> errors = [];
   final bool verbose;
+  final bool useGC;
 
-  Compiler({this.verbose = false});
+  Compiler({this.verbose = false, this.useGC = true});
 
   /// Compile a Plasm source file to WASM
   Future<bool> compile(String sourcePath, String outputPath) async {
@@ -103,6 +104,7 @@ class Compiler {
       
       if (verbose) {
         print('Generated IR module: $moduleName');
+        print('Using ${useGC ? "GC" : "linear memory"} mode');
         print('\nIR Dump:');
         print(irBuilder.module.toString());
       }
@@ -117,12 +119,18 @@ class Compiler {
         print('Ran optimization passes');
       }
 
-      // Generate WAT
-      final watGenerator = WatGenerator(irBuilder.module);
-      final watCode = watGenerator.generate();
+      // Generate WAT (choose GC or non-GC generator)
+      final String watCode;
+      if (useGC) {
+        final watGenerator = WatGeneratorGC(irBuilder.module, useGC: true);
+        watCode = watGenerator.generate();
+      } else {
+        final watGenerator = WatGenerator(irBuilder.module);
+        watCode = watGenerator.generate();
+      }
       
       if (verbose) {
-        print('\nGenerated WAT:');
+        print('\nGenerated WAT (${useGC ? "with GC" : "linear memory"}):');
         print(watCode);
       }
 
@@ -162,7 +170,12 @@ class Compiler {
   Future<bool> _runWat2Wasm(String watPath, String wasmPath) async {
     try {
       // Try to run wat2wasm
-      final result = await Process.run('wat2wasm', [watPath, '-o', wasmPath]);
+      final result = await Process.run('wat2wasm', [
+        watPath,
+        '-o',
+        wasmPath,
+        if (useGC) '--enable-gc',  // Enable GC features in wat2wasm
+      ]);
       
       if (result.exitCode == 0) {
         if (verbose && result.stdout.toString().isNotEmpty) {

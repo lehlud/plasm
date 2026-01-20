@@ -30,17 +30,21 @@ void printUsage() {
   print('');
   print('Options:');
   print('  -v, --verbose    Enable verbose output');
+  print('  --gc             Use WebAssembly GC (default)');
+  print('  --no-gc          Use linear memory instead of GC');
   print('  -h, --help       Show this help message');
   print('');
   print('Examples:');
-  print('  plasm hello.plasm                       Compile to hello.wasm');
+  print('  plasm hello.plasm                       Compile to hello.wasm with GC');
+  print('  plasm --no-gc hello.plasm               Compile with linear memory');
   print('  plasm hello.plasm output.wasm           Compile to specific output');
-  print('  plasm run hello.plasm                   Compile and run');
+  print('  plasm run hello.plasm                   Compile and run with GC');
   print('  plasm run hello.plasm arg1 arg2         Compile and run with arguments');
 }
 
 Future<void> compileCommand(List<String> arguments) async {
   var verbose = false;
+  var useGC = true;
   var sourcePath = '';
   var outputPath = '';
 
@@ -50,6 +54,10 @@ Future<void> compileCommand(List<String> arguments) async {
     
     if (arg == '-v' || arg == '--verbose') {
       verbose = true;
+    } else if (arg == '--gc') {
+      useGC = true;
+    } else if (arg == '--no-gc') {
+      useGC = false;
     } else if (sourcePath.isEmpty) {
       sourcePath = arg;
     } else if (outputPath.isEmpty) {
@@ -74,10 +82,10 @@ Future<void> compileCommand(List<String> arguments) async {
   }
 
   // Compile
-  final compiler = Compiler(verbose: verbose);
+  final compiler = Compiler(verbose: verbose, useGC: useGC);
   
   if (verbose) {
-    print('Compiling $sourcePath...');
+    print('Compiling $sourcePath (${useGC ? "with GC" : "linear memory"})...');
   }
   final success = await compiler.compile(sourcePath, outputPath);
 
@@ -101,6 +109,7 @@ Future<void> runCommand(List<String> arguments) async {
   }
 
   var verbose = false;
+  var useGC = true;
   var sourcePath = '';
   final programArgs = <String>[];
 
@@ -110,6 +119,10 @@ Future<void> runCommand(List<String> arguments) async {
     
     if (arg == '-v' || arg == '--verbose') {
       verbose = true;
+    } else if (arg == '--gc') {
+      useGC = true;
+    } else if (arg == '--no-gc') {
+      useGC = false;
     } else if (sourcePath.isEmpty) {
       sourcePath = arg;
     } else {
@@ -131,10 +144,10 @@ Future<void> runCommand(List<String> arguments) async {
 
   try {
     // Compile
-    final compiler = Compiler(verbose: verbose);
+    final compiler = Compiler(verbose: verbose, useGC: useGC);
     
     if (verbose) {
-      print('Compiling $sourcePath...');
+      print('Compiling $sourcePath (${useGC ? "with GC" : "linear memory"})...');
     }
     final success = await compiler.compile(sourcePath, outputPath);
 
@@ -178,8 +191,12 @@ Future<void> runCommand(List<String> arguments) async {
         exit(1);
       }
 
-      final runArgs = ['node', wasiRunnerPath, wasmFile.path, ...programArgs];
-      final result = await Process.run(runArgs[0], runArgs.sublist(1));
+      final nodeArgs = [wasiRunnerPath, wasmFile.path, ...programArgs];
+      if (useGC) {
+        nodeArgs.insert(0, '--experimental-wasm-gc');
+      }
+      
+      final result = await Process.run('node', nodeArgs);
       
       stdout.write(result.stdout);
       stderr.write(result.stderr);
@@ -188,8 +205,15 @@ Future<void> runCommand(List<String> arguments) async {
       // Try wasmtime
       final wasmtimeResult = await Process.run('which', ['wasmtime']);
       if (wasmtimeResult.exitCode == 0) {
-        final runArgs = ['wasmtime', wasmFile.path, ...programArgs];
-        final result = await Process.run(runArgs[0], runArgs.sublist(1));
+        final wasmtimeArgs = [wasmFile.path, ...programArgs];
+        if (useGC) {
+          wasmtimeArgs.insert(0, '--wasm-features=gc');
+          wasmtimeArgs.insert(0, 'run');
+        } else {
+          wasmtimeArgs.insert(0, 'run');
+        }
+        
+        final result = await Process.run('wasmtime', wasmtimeArgs);
         
         stdout.write(result.stdout);
         stderr.write(result.stderr);
