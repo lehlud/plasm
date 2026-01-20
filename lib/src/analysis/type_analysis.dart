@@ -198,6 +198,11 @@ class TypeAnalyzer implements AstVisitor {
   /// before falling back to default operator behavior.
   final Map<String, Map<String, OperatorDecl>> _classOperators = {};
   
+  /// Maps class names to their constructors.
+  /// Structure: className -> [ConstructorDecl]
+  /// Supports constructor overloading by storing all constructors for a class.
+  final Map<String, List<ConstructorDecl>> _classConstructors = {};
+  
   PlasmType? _currentFunctionReturnType;
   String? _currentClassName;
 
@@ -338,13 +343,16 @@ class TypeAnalyzer implements AstVisitor {
   void visitClassDecl(ClassDecl node) {
     _currentClassName = node.name;
     _classOperators[node.name] = {};
+    _classConstructors[node.name] = [];
     
     _enterScope();
 
-    // First pass: collect operators
+    // First pass: collect operators and constructors
     for (final member in node.members) {
       if (member is OperatorDecl) {
         _classOperators[node.name]![member.operator] = member;
+      } else if (member is ConstructorDecl) {
+        _classConstructors[node.name]!.add(member);
       }
     }
 
@@ -660,6 +668,70 @@ class TypeAnalyzer implements AstVisitor {
       }
     } else if (node is CallExpr) {
       node.callee.accept(this);
+      
+      // Check if this is a constructor call (callee is a class name)
+      if (node.callee is IdentifierExpr) {
+        final calleeName = (node.callee as IdentifierExpr).name;
+        
+        // Check if this identifier refers to a class (has constructors)
+        if (_classConstructors.containsKey(calleeName)) {
+          // This is a constructor call - validate it
+          for (final arg in node.arguments) {
+            arg.accept(this);
+          }
+          
+          // Find matching constructor
+          final constructors = _classConstructors[calleeName]!;
+          if (constructors.isEmpty) {
+            _error('No constructors defined for class $calleeName',
+                   node.line, node.column);
+            _setType(node, PlasmType(calleeName));
+            return;
+          }
+          
+          // Filter by parameter count
+          final candidatesByCount = constructors.where(
+            (c) => c.parameters.length == node.arguments.length
+          ).toList();
+          
+          if (candidatesByCount.isEmpty) {
+            _error('No constructor found for class $calleeName with ${node.arguments.length} arguments',
+                   node.line, node.column);
+            _setType(node, PlasmType(calleeName));
+            return;
+          }
+          
+          // Check type compatibility
+          ConstructorDecl? matchedConstructor;
+          for (final candidate in candidatesByCount) {
+            bool matches = true;
+            for (int i = 0; i < candidate.parameters.length; i++) {
+              final paramType = _resolveTypeSpec(candidate.parameters[i].type);
+              final argType = _nodeTypes[node.arguments[i]];
+              
+              if (argType != null && !argType.isCompatibleWith(paramType)) {
+                matches = false;
+                break;
+              }
+            }
+            
+            if (matches) {
+              matchedConstructor = candidate;
+              break;
+            }
+          }
+          
+          if (matchedConstructor == null) {
+            _error('No matching constructor found for class $calleeName with given argument types',
+                   node.line, node.column);
+          }
+          
+          _setType(node, PlasmType(calleeName));
+          return;
+        }
+      }
+      
+      // Not a constructor call - handle as regular function/lambda call
       for (final arg in node.arguments) {
         arg.accept(this);
       }
@@ -732,9 +804,59 @@ class TypeAnalyzer implements AstVisitor {
       // Tuple type would be a composite of element types
       _setType(node, PlasmType('tuple'));
     } else if (node is ConstructorCallExpr) {
+      // Type check constructor arguments
       for (final arg in node.arguments) {
         arg.accept(this);
       }
+      
+      // Find matching constructor based on argument count and types
+      final constructors = _classConstructors[node.className];
+      if (constructors == null || constructors.isEmpty) {
+        _error('No constructors defined for class ${node.className}',
+               node.line, node.column);
+        _setType(node, PlasmType(node.className));
+        return;
+      }
+      
+      // Try to find a matching constructor
+      ConstructorDecl? matchedConstructor;
+      
+      // Filter by parameter count
+      final candidatesByCount = constructors.where(
+        (c) => c.parameters.length == node.arguments.length
+      ).toList();
+      
+      if (candidatesByCount.isEmpty) {
+        _error('No constructor found for class ${node.className} with ${node.arguments.length} arguments',
+               node.line, node.column);
+        _setType(node, PlasmType(node.className));
+        return;
+      }
+      
+      // Check type compatibility for each candidate
+      for (final candidate in candidatesByCount) {
+        bool matches = true;
+        for (int i = 0; i < candidate.parameters.length; i++) {
+          final paramType = _resolveTypeSpec(candidate.parameters[i].type);
+          final argType = _nodeTypes[node.arguments[i]];
+          
+          if (argType != null && !argType.isCompatibleWith(paramType)) {
+            matches = false;
+            break;
+          }
+        }
+        
+        if (matches) {
+          matchedConstructor = candidate;
+          break;
+        }
+      }
+      
+      if (matchedConstructor == null) {
+        _error('No matching constructor found for class ${node.className} with given argument types',
+               node.line, node.column);
+      }
+      
       _setType(node, PlasmType(node.className));
     } else if (node is SelfExpr) {
       // Type would be the current class type

@@ -130,7 +130,7 @@ class IrBuilder {
   }
 
   void _buildClassDecl(ClassDecl node) {
-    // Build class methods and operators
+    // Build class methods, operators, and constructors
     for (final member in node.members) {
       if (member is FunctionDecl) {
         // Build as a method (with implicit self parameter in the future)
@@ -139,8 +139,58 @@ class IrBuilder {
         _buildProcedureDecl(member);
       } else if (member is OperatorDecl) {
         _buildOperatorDecl(node.name, member);
+      } else if (member is ConstructorDecl) {
+        _buildConstructorDecl(node.name, member);
       }
     }
+  }
+
+  void _buildConstructorDecl(String className, ConstructorDecl node) {
+    final parameters = <IrValue>[];
+    
+    // Add parameters
+    for (final param in node.parameters) {
+      final paramType = _convertTypeSpec(param.type);
+      final irParam = IrParameter(_nextValueId++, param.name, paramType);
+      parameters.add(irParam);
+    }
+
+    // Generate constructor function name
+    // Include parameter types to support overloading
+    final paramTypeNames = node.parameters.map((p) => p.type.name).join('_');
+    final constructorName = paramTypeNames.isEmpty
+        ? '${className}_constructor'
+        : '${className}_constructor_$paramTypeNames';
+    
+    final returnType = IrType(className);
+    final function = IrFunction(constructorName, parameters, returnType);
+    _currentFunction = function;
+
+    // Save parameter values
+    for (final param in parameters) {
+      _namedValues[param.name!] = param;
+    }
+
+    // Create entry block
+    final entryBlock = IrBasicBlock(_nextBlockId++, label: 'entry');
+    function.addBlock(entryBlock);
+    _currentBlock = entryBlock;
+
+    // TODO: Allocate object and initialize fields
+    // For now, we'll create a struct.new instruction
+    // and then execute the constructor body
+    
+    // Build constructor body
+    _buildBlock(node.body);
+
+    // Clear state
+    _currentFunction = null;
+    _currentBlock = null;
+    for (final param in parameters) {
+      _namedValues.remove(param.name);
+    }
+
+    module.addFunction(function);
   }
 
   void _buildOperatorDecl(String className, OperatorDecl node) {
@@ -476,6 +526,34 @@ class IrBuilder {
   }
 
   IrValue? _buildCallExpr(CallExpr expr) {
+    // Check if this is a constructor call
+    if (expr.callee is IdentifierExpr) {
+      final calleeName = (expr.callee as IdentifierExpr).name;
+      
+      // Check if this is a class name by looking at type analyzer's class constructors
+      // For now, we'll check if the name starts with uppercase (convention for classes)
+      if (calleeName.isNotEmpty && calleeName[0] == calleeName[0].toUpperCase()) {
+        // Likely a constructor call - build it as such
+        final args = <IrValue>[];
+        for (final arg in expr.arguments) {
+          final argValue = _buildExpression(arg);
+          if (argValue != null) args.add(argValue);
+        }
+        
+        // Determine which constructor to call based on argument types
+        final argTypes = args.map((a) => a.type!.name).join('_');
+        final constructorName = argTypes.isEmpty
+            ? '${calleeName}_constructor'
+            : '${calleeName}_constructor_$argTypes';
+        
+        // Create a call to the constructor function
+        final funcRef = IrConstant(_nextValueId++, constructorName, IrType('string'));
+        return _createInstruction(IrOpcode.call, [funcRef, ...args], 
+                                  type: IrType(calleeName));
+      }
+    }
+    
+    // Regular function call
     final args = <IrValue>[];
     for (final arg in expr.arguments) {
       final argValue = _buildExpression(arg);
@@ -527,11 +605,6 @@ class IrBuilder {
   }
 
   IrValue? _buildConstructorCallExpr(ConstructorCallExpr expr) {
-    // For now, treat constructor calls as creating a struct instance
-    // In a full implementation, this would allocate the object and call the constructor
-    final className = expr.className;
-    final classType = IrType(className);
-    
     // Build constructor arguments
     final args = <IrValue>[];
     for (final arg in expr.arguments) {
@@ -539,9 +612,16 @@ class IrBuilder {
       if (argValue != null) args.add(argValue);
     }
     
-    // Create a struct.new instruction (simplified)
-    // In reality, we'd need to look up the class structure and initialize fields
-    return _createInstruction(IrOpcode.structNew, args, type: classType);
+    // Determine which constructor to call based on argument types
+    final argTypes = args.map((a) => a.type!.name).join('_');
+    final constructorName = argTypes.isEmpty
+        ? '${expr.className}_constructor'
+        : '${expr.className}_constructor_$argTypes';
+    
+    // Create a call to the constructor function
+    final funcRef = IrConstant(_nextValueId++, constructorName, IrType('string'));
+    return _createInstruction(IrOpcode.call, [funcRef, ...args], 
+                              type: IrType(expr.className));
   }
 
   IrValue? _buildLambdaExpr(LambdaExpr expr) {
