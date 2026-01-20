@@ -386,7 +386,16 @@ class IrBuilder {
   }
 
   IrValue? _buildCallExpr(CallExpr expr) {
-    final callee = _buildExpression(expr.callee);
+    // Handle function calls - callee should be an identifier for function name
+    IrValue? callee;
+    if (expr.callee is IdentifierExpr) {
+      final funcName = (expr.callee as IdentifierExpr).name;
+      // Create a constant with the function name (use string type)
+      callee = IrConstant(_nextValueId++, funcName, IrType('string'));
+    } else {
+      callee = _buildExpression(expr.callee);
+    }
+    
     if (callee == null) return null;
 
     final args = <IrValue>[];

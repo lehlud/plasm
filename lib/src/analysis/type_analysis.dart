@@ -419,10 +419,22 @@ class TypeAnalyzer implements AstVisitor {
         final initType = _nodeTypes[binding.initializer];
         
         if (varType != null && initType != null) {
-          // Allow implicit upcasting
-          if (!initType.canImplicitlyUpcastTo(varType) && !initType.isCompatibleWith(varType)) {
-            _error('Type mismatch: cannot assign $initType to $varType (no implicit conversion available)', 
-                   node.line, node.column);
+          // Special case: Allow integer literals to be implicitly downcast to target type
+          if (binding.initializer is LiteralExpr) {
+            final literal = binding.initializer as LiteralExpr;
+            if (literal.type == LiteralType.integer && varType.isInteger()) {
+              // Override the literal's type to match the declared type
+              _setType(binding.initializer!, varType);
+            } else if (!initType.canImplicitlyUpcastTo(varType) && !initType.isCompatibleWith(varType)) {
+              _error('Type mismatch: cannot assign $initType to $varType (no implicit conversion available)', 
+                     node.line, node.column);
+            }
+          } else {
+            // Allow implicit upcasting for non-literals
+            if (!initType.canImplicitlyUpcastTo(varType) && !initType.isCompatibleWith(varType)) {
+              _error('Type mismatch: cannot assign $initType to $varType (no implicit conversion available)', 
+                     node.line, node.column);
+            }
           }
         } else if (varType == null) {
           varType = initType;

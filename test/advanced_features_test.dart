@@ -107,6 +107,16 @@ void main() {
       final typeAnalyzer = TypeAnalyzer();
       typeAnalyzer.analyze(ast);
       
+      if (typeAnalyzer.errors.isNotEmpty) {
+        print('Type errors: ${typeAnalyzer.errors}');
+        // Test canImplicitlyUpcastTo directly
+        final u8Type = PlasmType.u8;
+        final u16Type = PlasmType.u16;
+        print('u8 can upcast to u16: ${u8Type.canImplicitlyUpcastTo(u16Type)}');
+        print('u8 isUnsigned: ${u8Type.isUnsigned()}, getBitWidth: ${u8Type.getBitWidth()}');
+        print('u16 isUnsigned: ${u16Type.isUnsigned()}, getBitWidth: ${u16Type.getBitWidth()}');
+      }
+      
       expect(typeAnalyzer.errors.isEmpty, true);
     });
 

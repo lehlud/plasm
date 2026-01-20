@@ -83,13 +83,83 @@ class WatGenerator {
       _writeLine('(local ${local.key} ${local.value})');
     }
 
-    // Generate function body
-    for (final block in function.blocks) {
-      _generateBlock(block);
-    }
+    // Generate function body by analyzing blocks and reconstructing control flow
+    _generateFunctionBody(function);
 
     _indentLevel--;
     _writeLine(')');
+  }
+
+  void _generateFunctionBody(IrFunction function) {
+    if (function.blocks.isEmpty) return;
+
+    final visited = <int>{};
+    _generateBlockStructured(function.blocks[0], function.blocks, visited);
+  }
+
+  void _generateBlockStructured(IrBasicBlock block, List<IrBasicBlock> allBlocks, Set<int> visited) {
+    if (visited.contains(block.id)) return;
+    visited.add(block.id);
+
+    // Generate instructions in this block
+    for (final instruction in block.instructions) {
+      _generateInstruction(instruction);
+    }
+
+    // Handle terminator
+    if (block.terminator != null) {
+      final terminator = block.terminator!;
+      
+      if (terminator.opcode == IrOpcode.condBr) {
+        // Conditional branch - reconstruct if-then-else
+        _generateValue(terminator.operands[0]);
+        _writeLine('if');
+        _indentLevel++;
+
+        // Find the then and else blocks (next blocks after current)
+        final currentIndex = allBlocks.indexOf(block);
+        if (currentIndex + 1 < allBlocks.length) {
+          final thenBlock = allBlocks[currentIndex + 1];
+          
+          // Check if it's a 'then' or 'merge' block
+          if (thenBlock.label == 'then') {
+            _generateBlockStructured(thenBlock, allBlocks, visited);
+            
+            // Check for else block
+            final thenIndex = allBlocks.indexOf(thenBlock);
+            if (thenIndex + 1 < allBlocks.length) {
+              final nextBlock = allBlocks[thenIndex + 1];
+              if (nextBlock.label == 'else') {
+                _indentLevel--;
+                _writeLine('else');
+                _indentLevel++;
+                _generateBlockStructured(nextBlock, allBlocks, visited);
+              }
+            }
+          }
+        }
+
+        _indentLevel--;
+        _writeLine('end');
+        
+        // Continue with merge block
+        final mergeIndex = allBlocks.indexWhere((b) => b.label == 'merge' && !visited.contains(b.id));
+        if (mergeIndex >= 0) {
+          _generateBlockStructured(allBlocks[mergeIndex], allBlocks, visited);
+        }
+      } else if (terminator.opcode == IrOpcode.ret) {
+        if (terminator.operands.isNotEmpty) {
+          _generateValue(terminator.operands[0]);
+        }
+        _writeLine('return');
+      } else if (terminator.opcode == IrOpcode.br) {
+        // Unconditional branch - just continue to next block
+        final currentIndex = allBlocks.indexOf(block);
+        if (currentIndex + 1 < allBlocks.length && !visited.contains(allBlocks[currentIndex + 1].id)) {
+          _generateBlockStructured(allBlocks[currentIndex + 1], allBlocks, visited);
+        }
+      }
+    }
   }
 
   Map<String, String> _collectLocals(IrFunction function) {
@@ -100,22 +170,25 @@ class WatGenerator {
   }
 
   void _generateBlock(IrBasicBlock block) {
-    if (block.label != null && block.label != 'entry') {
-      _writeLine('(block \$${block.label}');
-      _indentLevel++;
+    // Don't wrap entry block
+    if (block.label == 'entry') {
+      for (final instruction in block.instructions) {
+        _generateInstruction(instruction);
+      }
+      if (block.terminator != null) {
+        _generateInstruction(block.terminator!);
+      }
+      return;
     }
 
+    // For other blocks, just generate instructions inline
+    // The structured control flow is handled by if/loop/block constructs
     for (final instruction in block.instructions) {
       _generateInstruction(instruction);
     }
 
     if (block.terminator != null) {
       _generateInstruction(block.terminator!);
-    }
-
-    if (block.label != null && block.label != 'entry') {
-      _indentLevel--;
-      _writeLine(')');
     }
   }
 
@@ -184,15 +257,11 @@ class WatGenerator {
         _generateCall(instruction);
         break;
       case IrOpcode.br:
-        _writeLine('br 0');
+        // Unconditional branch - just continue to next block
         break;
       case IrOpcode.condBr:
-        _generateValue(instruction.operands[0]);
-        _writeLine('if');
-        _indentLevel++;
-        _writeLine('br 1');
-        _indentLevel--;
-        _writeLine('end');
+        // Conditional branch is handled by building proper if-then-else
+        // This simplified version just falls through
         break;
       default:
         _writeLine(';; Unsupported instruction: ${instruction.opcode}');
@@ -243,7 +312,10 @@ class WatGenerator {
 
     // Generate call
     final callee = instruction.operands[0];
-    if (callee is IrValue && callee.name != null) {
+    if (callee is IrConstant && callee.type?.name == 'string') {
+      // Function name as string constant
+      _writeLine('call \$${callee.value}');
+    } else if (callee is IrValue && callee.name != null) {
       _writeLine('call \$${callee.name}');
     }
   }
