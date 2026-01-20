@@ -2,6 +2,12 @@ import 'package:plasm/plasm.dart';
 import 'package:test/test.dart';
 
 void main() {
+  // Ensure tests complete properly
+  tearDownAll(() async {
+    // Give time for any pending async operations to complete
+    await Future.delayed(Duration(milliseconds: 100));
+  });
+
   group('WebAssembly GC - Basic Tests', () {
     test('WAT generator can be created', () {
       final module = IrModule('test');
