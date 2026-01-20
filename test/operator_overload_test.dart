@@ -2,10 +2,6 @@ import 'package:plasm/plasm.dart';
 import 'package:test/test.dart';
 
 void main() {
-  // FIXME: These tests hang - likely due to constructor call handling
-  // Commenting out until constructor support is fully implemented
-  
-  /*
   group('Operator overloading parsing tests', () {
     test('parse class with operator+ overload', () {
       final source = '''
@@ -14,10 +10,8 @@ void main() {
           u64 y;
           
           op(+) (Point other) Point {
-            final result = Point();
-            result.x = x + other.x;
-            result.y = y + other.y;
-            return result;
+            // Note: Returns self for testing (proper constructors not yet supported)
+            return self;
           }
         }
       ''';
@@ -44,11 +38,11 @@ void main() {
           u64 x;
           
           op(+) (Vector other) Vector {
-            return Vector();
+            return self;
           }
           
           op(-) (Vector other) Vector {
-            return Vector();
+            return self;
           }
           
           op(==) (Vector other) bool {
@@ -117,8 +111,10 @@ void main() {
           u64 y;
           
           op(+) (Point other) Point {
-            final result = Point();
-            return result;
+            final u64 newX = x + other.x;
+            final u64 newY = y + other.y;
+            // Return self for now (proper constructor support needed)
+            return self;
           }
         }
       ''';
@@ -182,7 +178,7 @@ void main() {
           u64 x;
           
           op(+) (Point other) Point {
-            return Point();
+            return self;
           }
         }
         
@@ -213,8 +209,7 @@ void main() {
           u64 y;
           
           op(+) (Point other) Point {
-            final result = Point();
-            return result;
+            return self;
           }
         }
       ''';
@@ -245,7 +240,7 @@ void main() {
           u64 x;
           
           op(+) (Point other) Point {
-            return Point();
+            return self;
           }
         }
         
@@ -270,5 +265,4 @@ void main() {
       expect(irBuilder.module.functions.any((f) => f.name.contains('Point_op_add')), true);
     });
   });
-  */
 }

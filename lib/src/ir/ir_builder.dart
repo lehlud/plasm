@@ -348,6 +348,8 @@ class IrBuilder {
       return _buildCastExpr(expr);
     } else if (expr is LambdaExpr) {
       return _buildLambdaExpr(expr);
+    } else if (expr is ConstructorCallExpr) {
+      return _buildConstructorCallExpr(expr);
     } else if (expr is ArrayAllocationExpr) {
       return _buildArrayAllocationExpr(expr);
     } else if (expr is ArrayIndexExpr) {
@@ -522,6 +524,24 @@ class IrBuilder {
 
     final targetType = _convertTypeSpec(expr.type);
     return _createInstruction(IrOpcode.cast, [value], type: targetType);
+  }
+
+  IrValue? _buildConstructorCallExpr(ConstructorCallExpr expr) {
+    // For now, treat constructor calls as creating a struct instance
+    // In a full implementation, this would allocate the object and call the constructor
+    final className = expr.className;
+    final classType = IrType(className);
+    
+    // Build constructor arguments
+    final args = <IrValue>[];
+    for (final arg in expr.arguments) {
+      final argValue = _buildExpression(arg);
+      if (argValue != null) args.add(argValue);
+    }
+    
+    // Create a struct.new instruction (simplified)
+    // In reality, we'd need to look up the class structure and initialize fields
+    return _createInstruction(IrOpcode.structNew, args, type: classType);
   }
 
   IrValue? _buildLambdaExpr(LambdaExpr expr) {
