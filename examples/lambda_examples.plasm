@@ -1,0 +1,113 @@
+// Example demonstrating lambda/closure features in Plasm
+
+import stdlib/io;
+
+// Example 1: Simple lambda with expression body
+fn example1() void {
+  io.$println("Example 1: Simple lambda");
+  
+  final add = @(u64 x, u64 y) => x + y;
+  final result = add(10, 20);
+  
+  io.$print("10 + 20 = ");
+  io.$println(result);
+}
+
+// Example 2: Lambda with block body
+fn example2() void {
+  io.$println("Example 2: Lambda with block");
+  
+  final multiply = @(u64 x, u64 y) {
+    final temp = x * y;
+    return temp;
+  };
+  
+  final result = multiply(5, 6);
+  io.$print("5 * 6 = ");
+  io.$println(result);
+}
+
+// Example 3: Higher-order function (function taking a lambda)
+fn applyTwice(u64 x, (u64) -> u64 func) u64 {
+  return func(func(x));
+}
+
+fn example3() void {
+  io.$println("Example 3: Higher-order function");
+  
+  final double = @(u64 x) => x * 2;
+  final result = applyTwice(5, double);
+  
+  io.$print("applyTwice(5, double) = ");
+  io.$println(result);
+}
+
+// Example 4: Lambda closure (capturing outer variables)
+fn example4() void {
+  io.$println("Example 4: Closure");
+  
+  final u64 multiplier = 10;
+  final scale = @(u64 x) => x * multiplier;
+  
+  final result = scale(5);
+  io.$print("scale(5) with multiplier=10: ");
+  io.$println(result);
+}
+
+// Example 5: Returning a lambda
+fn makeAdder(u64 n) (u64) -> u64 {
+  return @(u64 x) => x + n;
+}
+
+fn example5() void {
+  io.$println("Example 5: Returning lambda");
+  
+  final add5 = makeAdder(5);
+  final result = add5(10);
+  
+  io.$print("add5(10) = ");
+  io.$println(result);
+}
+
+// Example 6: Array of lambdas
+fn example6() void {
+  io.$println("Example 6: Array of lambdas");
+  
+  // Create an array of mathematical operations
+  final ops = [
+    @(u64 x, u64 y) => x + y,
+    @(u64 x, u64 y) => x - y,
+    @(u64 x, u64 y) => x * y
+  ];
+  
+  io.$print("10 + 5 = ");
+  io.$println(ops[0](10, 5));
+  
+  io.$print("10 - 5 = ");
+  io.$println(ops[1](10, 5));
+  
+  io.$print("10 * 5 = ");
+  io.$println(ops[2](10, 5));
+}
+
+pub proc $main() void {
+  io.$println("=== Lambda/Closure Examples ===");
+  io.$println("");
+  
+  example1();
+  io.$println("");
+  
+  example2();
+  io.$println("");
+  
+  example3();
+  io.$println("");
+  
+  example4();
+  io.$println("");
+  
+  example5();
+  io.$println("");
+  
+  example6();
+}

@@ -1,0 +1,191 @@
+// Example demonstrating operator overloading in Plasm
+
+import stdlib/io;
+
+// Example 1: Vector class with operator overloading
+class Vector2D {
+  f64 x;
+  f64 y;
+  
+  constructor(f64 x, f64 y) {
+    self.x = x;
+    self.y = y;
+  }
+  
+  // Operator overload: addition
+  op(+) (Vector2D other) Vector2D {
+    return Vector2D(x + other.x, y + other.y);
+  }
+  
+  // Operator overload: subtraction
+  op(-) (Vector2D other) Vector2D {
+    return Vector2D(x - other.x, y - other.y);
+  }
+  
+  // Operator overload: multiplication by scalar (passed as Vector2D for simplicity)
+  op(*) (Vector2D other) Vector2D {
+    return Vector2D(x * other.x, y * other.y);
+  }
+  
+  // Operator overload: equality
+  op(==) (Vector2D other) bool {
+    return x == other.x && y == other.y;
+  }
+  
+  proc $print() void {
+    io.$print("Vector2D(");
+    io.$print(x);
+    io.$print(", ");
+    io.$print(y);
+    io.$println(")");
+  }
+}
+
+// Example 2: Complex number class
+class Complex {
+  f64 real;
+  f64 imag;
+  
+  constructor(f64 real, f64 imag) {
+    self.real = real;
+    self.imag = imag;
+  }
+  
+  // Addition: (a + bi) + (c + di) = (a+c) + (b+d)i
+  op(+) (Complex other) Complex {
+    return Complex(real + other.real, imag + other.imag);
+  }
+  
+  // Subtraction: (a + bi) - (c + di) = (a-c) + (b-d)i
+  op(-) (Complex other) Complex {
+    return Complex(real - other.real, imag - other.imag);
+  }
+  
+  // Multiplication: (a + bi) * (c + di) = (ac-bd) + (ad+bc)i
+  op(*) (Complex other) Complex {
+    final newReal = real * other.real - imag * other.imag;
+    final newImag = real * other.imag + imag * other.real;
+    return Complex(newReal, newImag);
+  }
+  
+  // Equality
+  op(==) (Complex other) bool {
+    return real == other.real && imag == other.imag;
+  }
+  
+  proc $print() void {
+    io.$print(real);
+    if (imag >= 0.0) {
+      io.$print(" + ");
+    } else {
+      io.$print(" - ");
+    }
+    io.$print(imag);
+    io.$println("i");
+  }
+}
+
+// Example 3: Fraction class with comparison operators
+class Fraction {
+  i64 numerator;
+  i64 denominator;
+  
+  constructor(i64 num, i64 denom) {
+    self.numerator = num;
+    self.denominator = denom;
+  }
+  
+  // Convert to f64 for comparison
+  fn toDouble() f64 {
+    return numerator as f64 / denominator as f64;
+  }
+  
+  op(+) (Fraction other) Fraction {
+    final newNum = numerator * other.denominator + other.numerator * denominator;
+    final newDenom = denominator * other.denominator;
+    return Fraction(newNum, newDenom);
+  }
+  
+  op(==) (Fraction other) bool {
+    return numerator * other.denominator == other.numerator * denominator;
+  }
+  
+  op(<) (Fraction other) bool {
+    return numerator * other.denominator < other.numerator * denominator;
+  }
+  
+  op(>) (Fraction other) bool {
+    return numerator * other.denominator > other.numerator * denominator;
+  }
+  
+  proc $print() void {
+    io.$print(numerator);
+    io.$print("/");
+    io.$println(denominator);
+  }
+}
+
+pub proc $main() void {
+  io.$println("=== Operator Overloading Examples ===");
+  io.$println("");
+  
+  // Vector example
+  io.$println("Vector2D operations:");
+  final v1 = Vector2D(3.0, 4.0);
+  final v2 = Vector2D(1.0, 2.0);
+  
+  io.$print("v1 = ");
+  v1.$print();
+  io.$print("v2 = ");
+  v2.$print();
+  
+  final v3 = v1 + v2;
+  io.$print("v1 + v2 = ");
+  v3.$print();
+  
+  final v4 = v1 - v2;
+  io.$print("v1 - v2 = ");
+  v4.$print();
+  
+  io.$println("");
+  
+  // Complex number example
+  io.$println("Complex number operations:");
+  final c1 = Complex(3.0, 4.0);
+  final c2 = Complex(1.0, 2.0);
+  
+  io.$print("c1 = ");
+  c1.$print();
+  io.$print("c2 = ");
+  c2.$print();
+  
+  final c3 = c1 + c2;
+  io.$print("c1 + c2 = ");
+  c3.$print();
+  
+  final c4 = c1 * c2;
+  io.$print("c1 * c2 = ");
+  c4.$print();
+  
+  io.$println("");
+  
+  // Fraction example
+  io.$println("Fraction operations:");
+  final f1 = Fraction(1, 2);
+  final f2 = Fraction(1, 3);
+  
+  io.$print("f1 = ");
+  f1.$print();
+  io.$print("f2 = ");
+  f2.$print();
+  
+  final f3 = f1 + f2;
+  io.$print("f1 + f2 = ");
+  f3.$print();
+  
+  if (f1 > f2) {
+    io.$println("f1 > f2");
+  } else {
+    io.$println("f1 <= f2");
+  }
+}

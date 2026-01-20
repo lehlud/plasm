@@ -29,7 +29,8 @@ Plasm is a modern, statically-typed programming language that compiles to WebAss
 - **Functions** (`fn`) - pure computations without side effects
 - **Procedures** (`proc`) - operations that can have side effects (prefixed with `$`)
 - **Generic parameters** for polymorphic code
-- **First-class functions** and closures (planned)
+- **Lambdas and closures** - anonymous functions with lexical scoping
+- **Operator overloading** - define custom behavior for operators on user types
 
 ### Standard Library
 - **stdlib/io** - Console I/O with `$println`, `$print`, `readLine`
@@ -141,6 +142,16 @@ proc $print_sum(u64 a, u64 b) void {
   final result = add(a, b);
   io.$println(result);
 }
+
+// Lambda: anonymous function
+fn transform(u64 x, (u64) -> u64 func) u64 {
+  return func(x);
+}
+
+fn example() u64 {
+  final double = @(u64 x) => x * 2;
+  return transform(5, double);  // Returns 10
+}
 ```
 
 ### Control Flow
@@ -175,6 +186,74 @@ final y = 100;
 final u32 z = 200;
 ```
 
+### Lambdas and Closures
+
+Plasm supports anonymous functions (lambdas) with full closure support:
+
+```plasm
+// Lambda with expression body
+final add = @(u64 x, u64 y) => x + y;
+final result = add(10, 20);
+
+// Lambda with block body
+final multiply = @(u64 x, u64 y) {
+  return x * y;
+};
+
+// Closures capture outer variables
+final u64 multiplier = 10;
+final scale = @(u64 x) => x * multiplier;
+
+// Higher-order functions
+fn applyTwice(u64 x, (u64) -> u64 func) u64 {
+  return func(func(x));
+}
+
+final double = @(u64 x) => x * 2;
+final result = applyTwice(5, double);  // Returns 20
+```
+
+### Operator Overloading
+
+User-defined types can define custom behavior for operators:
+
+```plasm
+class Vector2D {
+  f64 x;
+  f64 y;
+  
+  // Overload addition operator
+  op(+) (Vector2D other) Vector2D {
+    return Vector2D(x + other.x, y + other.y);
+  }
+  
+  // Overload subtraction operator
+  op(-) (Vector2D other) Vector2D {
+    return Vector2D(x - other.x, y - other.y);
+  }
+  
+  // Overload equality operator
+  op(==) (Vector2D other) bool {
+    return x == other.x && y == other.y;
+  }
+  
+  // Overload comparison operators
+  op(<) (Vector2D other) bool {
+    return (x * x + y * y) < (other.x * other.x + other.y * other.y);
+  }
+}
+
+// Usage
+final v1 = Vector2D(1.0, 2.0);
+final v2 = Vector2D(3.0, 4.0);
+final v3 = v1 + v2;  // Calls op(+)
+```
+
+**Supported Operators for Overloading:**
+- Arithmetic: `+`, `-`, `*`, `/`, `%`
+- Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`
+- Logical: `&&`, `||`
+
 ### Classes (Planned)
 
 ```plasm
@@ -182,11 +261,22 @@ class Point {
   f64 x;
   f64 y;
   
+  // Operator overloading
+  op(+) (Point other) Point {
+    return Point(x + other.x, y + other.y);
+  }
+  
   fn distance(Point other) f64 {
     final dx = other.x - x;
     final dy = other.y - y;
     return sqrt(dx * dx + dy * dy);
   }
+}
+
+fn example() void {
+  final p1 = Point(1.0, 2.0);
+  final p2 = Point(3.0, 4.0);
+  final p3 = p1 + p2;  // Uses operator overload
 }
 ```
 
@@ -388,8 +478,8 @@ Contributions are welcome! Please:
 
 ### Planned Features
 
-- [ ] Lambdas and closures
-- [ ] Operator overloading
+- [x] Lambdas and closures
+- [x] Operator overloading
 - [ ] Pattern matching
 - [ ] Generics with constraints
 - [ ] Trait system
