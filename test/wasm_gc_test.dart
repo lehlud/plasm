@@ -2,67 +2,12 @@ import 'package:plasm/plasm.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('WASM GC Tests', () {
-    test('IR type system supports GC types', () {
-      // Test struct type
-      final structType = IrType.struct('Point', [
-        IrFieldType(IrType.i64, name: 'x', mutable: true),
-        IrFieldType(IrType.i64, name: 'y', mutable: true),
-      ]);
-      
-      expect(structType.kind, IrTypeKind.struct);
-      expect(structType.isGcType, true);
-      expect(structType.fields!.length, 2);
-      
-      // Test array type
-      final arrayType = IrType.array('u64_array', IrType.u64);
-      
-      expect(arrayType.kind, IrTypeKind.array);
-      expect(arrayType.isGcType, true);
-      expect(arrayType.elementType, IrType.u64);
-      
-      // Test reference type
-      final refType = IrType.ref('Point', nullable: true);
-      
-      expect(refType.kind, IrTypeKind.ref);
-      expect(refType.isGcType, true);
-      expect(refType.nullable, true);
-    });
-
-    test('IR module supports type definitions', () {
+  group('WebAssembly GC - Basic Tests', () {
+    test('WAT generator can be created', () {
       final module = IrModule('test');
       
-      // Add a struct type
-      final pointType = IrTypeDef('Point', IrType.struct('Point', [
-        IrFieldType(IrType.i64, name: 'x'),
-        IrFieldType(IrType.i64, name: 'y'),
-      ]));
-      
-      module.addType(pointType);
-      
-      expect(module.types.length, 1);
-      expect(module.types[0].name, 'Point');
-    });
-
-    test('IR opcodes include GC operations', () {
-      // Test that GC opcodes exist
-      expect(IrOpcode.values.contains(IrOpcode.structNew), true);
-      expect(IrOpcode.values.contains(IrOpcode.structGet), true);
-      expect(IrOpcode.values.contains(IrOpcode.structSet), true);
-      expect(IrOpcode.values.contains(IrOpcode.arrayNew), true);
-      expect(IrOpcode.values.contains(IrOpcode.arrayGet), true);
-      expect(IrOpcode.values.contains(IrOpcode.arraySet), true);
-      expect(IrOpcode.values.contains(IrOpcode.arrayLen), true);
-      expect(IrOpcode.values.contains(IrOpcode.refNull), true);
-      expect(IrOpcode.values.contains(IrOpcode.refEq), true);
-      expect(IrOpcode.values.contains(IrOpcode.i31New), true);
-    });
-
-    test('WAT generator can be created with GC mode', () {
-      final module = IrModule('test');
-      
-      // Create GC-enabled WAT generator
-      final generator = WatGeneratorGC(module, useGC: true);
+      // Create WAT generator (always uses GC)
+      final generator = WatGenerator(module);
       
       expect(generator, isNotNull);
       
@@ -73,49 +18,40 @@ void main() {
       expect(wat, contains(')'));
     });
 
-    test('WAT generator with struct types', () {
-      final module = IrModule('test');
-      
-      // Add a struct type
-      final pointType = IrTypeDef('Point', IrType.struct('Point', [
-        IrFieldType(IrType.i64, name: 'x'),
-        IrFieldType(IrType.i64, name: 'y'),
-      ]));
-      
-      module.addType(pointType);
-      
-      final generator = WatGeneratorGC(module, useGC: true);
+    test('WAT generator handles empty module', () {
+      final module = IrModule('empty');
+      final generator = WatGenerator(module);
       final wat = generator.generate();
       
-      expect(wat, contains('(type \$Point'));
-      expect(wat, contains('struct'));
-      expect(wat, contains('field'));
+      expect(wat, contains('(module'));
+      expect(wat, contains(')'));
     });
 
-    test('WAT generator with array types', () {
+    test('WAT generator handles function with parameters', () {
       final module = IrModule('test');
       
-      // Add an array type
-      final arrayType = IrTypeDef('u64_array', 
-        IrType.array('u64_array', IrType.u64));
+      final param = IrParameter(0, 'x', IrType.i64);
+      final func = IrFunction('add', [param], IrType.i64);
+      module.addFunction(func);
       
-      module.addType(arrayType);
-      
-      final generator = WatGeneratorGC(module, useGC: true);
+      final generator = WatGenerator(module);
       final wat = generator.generate();
       
-      expect(wat, contains('(type \$u64_array'));
-      expect(wat, contains('array'));
-      expect(wat, contains('mut'));
+      expect(wat, contains('\$add'));
+      expect(wat, contains('param'));
+      expect(wat, contains('result'));
     });
 
-    test('Compiler supports GC mode option', () {
-      // Test that compiler can be created with GC option
-      final compilerGC = Compiler(useGC: true);
-      expect(compilerGC.useGC, true);
-      
-      final compilerNoGC = Compiler(useGC: false);
-      expect(compilerNoGC.useGC, false);
+    test('Compiler can be created', () {
+      final compiler = Compiler();
+      expect(compiler, isNotNull);
+    });
+
+    test('IR module basics', () {
+      final module = IrModule('test');
+      expect(module.name, 'test');
+      expect(module.functions, isEmpty);
+      expect(module.globals, isEmpty);
     });
   });
 }

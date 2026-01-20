@@ -11,4 +11,3 @@ export 'src/ir/ir.dart';
 export 'src/ir/ir_builder.dart';
 export 'src/ir/visitor.dart';
 export 'src/codegen/wat_generator.dart';
-export 'src/codegen/wat_generator_gc.dart';

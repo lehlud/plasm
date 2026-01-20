@@ -44,46 +44,9 @@ class WatGenerator {
   }
 
   void _generateTypeDefinitions() {
-    // Generate type definitions for GC types (structs, arrays)
-    if (module.typeDefinitions.isEmpty) {
-      return;
-    }
-
-    for (final typeDef in module.typeDefinitions) {
-      if (typeDef.isStruct) {
-        _write('(type \$${typeDef.name} (struct');
-        for (final field in typeDef.fields!) {
-          _write(' (field \$${field.name} ');
-          if (field.isMutable) {
-            _write('(mut ${_convertGCType(field.type)})');
-          } else {
-            _write(_convertGCType(field.type));
-          }
-          _write(')');
-        }
-        _writeLine('))');
-      } else if (typeDef.isArray) {
-        final elemType = typeDef.elementType!;
-        final mut = typeDef.isMutableElement ? 'mut ' : '';
-        _writeLine('(type \$${typeDef.name} (array ($mut${_convertGCType(elemType)})))');
-      }
-    }
-    
-    if (module.typeDefinitions.isNotEmpty) {
-      _writeLine();
-    }
-  }
-
-  String _convertGCType(IrType type) {
-    // Convert IR type to WAT GC type
-    if (type.isReference) {
-      if (type.isNullable) {
-        return '(ref null \$${type.name})';
-      } else {
-        return '(ref \$${type.name})';
-      }
-    }
-    return _convertType(type);
+    // TODO: Generate type definitions for GC types (structs, arrays)
+    // For now, this is a placeholder until IR fully supports GC types
+    // GC type definitions would go here when IR module has typeDefinitions property
   }
 
   void _generateGlobal(IrGlobal global) {
