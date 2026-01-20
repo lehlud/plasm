@@ -226,7 +226,7 @@ void main() {
       final source = '''
         fn test() u64 {
           final u32 x = 10;
-          return (x) + 20;
+          return (x as u64) + 20;
         }
       ''';
 
