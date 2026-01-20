@@ -4,3 +4,9 @@
 dart-sdk/
 *.tar.gz
 wabt-*/
+
+# Dart SDK and tooling downloads
+dartsdk-linux-x64-release.zip
+dart-sdk/
+wabt-*.tar.gz
+wabt-*/
