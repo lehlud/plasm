@@ -327,11 +327,9 @@ class WatGenerator {
       _writeLine('call \$${callee.name}');
     }
     
-    // If this instruction has no users and returns a value, add drop
-    // This handles void procedure calls that invoke non-void functions
-    if (instruction.type != null && instruction.type!.name != 'void' && instruction.users.isEmpty) {
-      _writeLine('drop');
-    }
+    // TODO: Add proper use-def tracking to IR to determine when to add drop
+    // For now, we don't add drop instructions automatically
+    // The caller must explicitly handle unused return values
   }
 
   void _generateValue(IrValue value) {
