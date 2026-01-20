@@ -688,8 +688,8 @@ class Parser {
       expr = IsExpr(expr!, type, line, column);
     }
 
-    // Handle 'as' operator (explicit cast)
-    if (_match([TokenType.as_])) {
+    // Handle 'as' operator (explicit cast) - use while loop for left-associativity
+    while (_match([TokenType.as_])) {
       final line = _previous().line;
       final column = _previous().column;
       final type = _parseTypeSpec();

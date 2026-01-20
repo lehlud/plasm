@@ -206,37 +206,37 @@ void main() {
   });
 
   group('Edge cases', () {
-    // test('nested casts', () {
-    //   final source = '''
-    //     fn test() i64 {
-    //       final u8 x = 10;
-    //       return (x as u32) as i64;
-    //     }
-    //   ''';
+    test('nested casts', () {
+      final source = '''
+        fn test() i64 {
+          final u8 x = 10;
+          return (x as u32) as i64;
+        }
+      ''';
 
-    //   final lexer = Lexer(source);
-    //   final tokens = lexer.tokenize();
-    //   final parser = Parser(tokens);
-    //   final ast = parser.parse();
+      final lexer = Lexer(source);
+      final tokens = lexer.tokenize();
+      final parser = Parser(tokens);
+      final ast = parser.parse();
 
-    //   expect(parser.errors.isEmpty, true);
-    // });
+      expect(parser.errors.isEmpty, true);
+    });
 
-    // test('cast in expression', () {
-    //   final source = '''
-    //     fn test() u64 {
-    //       final u32 x = 10;
-    //       return (x as u64) + 20;
-    //     }
-    //   ''';
+    test('cast in expression', () {
+      final source = '''
+        fn test() u64 {
+          final u32 x = 10;
+          return (x as u64) + 20;
+        }
+      ''';
 
-    //   final lexer = Lexer(source);
-    //   final tokens = lexer.tokenize();
-    //   final parser = Parser(tokens);
-    //   final ast = parser.parse();
+      final lexer = Lexer(source);
+      final tokens = lexer.tokenize();
+      final parser = Parser(tokens);
+      final ast = parser.parse();
 
-    //   expect(parser.errors.isEmpty, true);
-    // });
+      expect(parser.errors.isEmpty, true);
+    });
 
     test('complex type compatibility', () {
       final source = '''
