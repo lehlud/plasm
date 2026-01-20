@@ -613,7 +613,7 @@ class IrBuilder {
     if (expr.elements.isEmpty) {
       return _createInstruction(IrOpcode.arrayNewDefault, 
         [IrConstant(_nextValueId++, 0, IrType.i32)],
-        type: IrType('array', [IrType.any]));
+        type: IrType('array', [IrType.anyref]));
     }
 
     final elements = <IrValue>[];
@@ -625,7 +625,7 @@ class IrBuilder {
     // Create array with size
     final size = IrConstant(_nextValueId++, expr.elements.length, IrType.i32);
     final array = _createInstruction(IrOpcode.arrayNewDefault, [size],
-      type: IrType('array', [elements.isNotEmpty ? elements[0].type! : IrType.any]));
+      type: IrType('array', [elements.isNotEmpty ? elements[0].type! : IrType.anyref]));
 
     // Set each element (simplified - would need proper array.set calls)
     for (int i = 0; i < elements.length; i++) {

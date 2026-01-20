@@ -139,7 +139,7 @@ void main() {
       final source = '''
         fn test() u64 {
           final f = @(u64 x) => x + 1;
-          return f(42);
+          return f(42 as u64);
         }
       ''';
 
