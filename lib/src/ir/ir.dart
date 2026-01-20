@@ -71,6 +71,11 @@ enum IrOpcode {
   i31New,         // ref.i31 <i32>
   i31GetS,        // i31.get_s <i31ref>
   i31GetU,        // i31.get_u <i31ref>
+
+  // Function values and closures
+  funcRef,        // ref.func <function-index>
+  lambda,         // Lambda expression (will be lowered to function)
+  callIndirect,   // call_indirect <function-type> <callee> <args>
 }
 
 /// IR value (SSA value)
