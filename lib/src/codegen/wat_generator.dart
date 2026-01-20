@@ -1,6 +1,7 @@
 import '../ir/ir.dart';
 
-/// Generates WAT (WebAssembly Text Format) from IR
+/// Generates WAT (WebAssembly Text Format) from IR with GC support
+/// Always uses WebAssembly GC proposal features
 class WatGenerator {
   final IrModule module;
   final StringBuffer _output = StringBuffer();
@@ -15,10 +16,11 @@ class WatGenerator {
     _writeLine('(module');
     _indentLevel++;
 
-    // Generate memory section
-    _writeLine('(memory 1)');
-    _writeLine('(export "memory" (memory 0))');
-    _writeLine();
+    // Generate type definitions for GC (structs and arrays)
+    _generateTypeDefinitions();
+    
+    // Note: No linear memory needed when using GC
+    // Memory is managed by the WebAssembly GC runtime
 
     // Generate globals
     for (final global in module.globals) {
@@ -39,6 +41,49 @@ class WatGenerator {
     _writeLine(')');
 
     return _output.toString();
+  }
+
+  void _generateTypeDefinitions() {
+    // Generate type definitions for GC types (structs, arrays)
+    if (module.typeDefinitions.isEmpty) {
+      return;
+    }
+
+    for (final typeDef in module.typeDefinitions) {
+      if (typeDef.isStruct) {
+        _write('(type \$${typeDef.name} (struct');
+        for (final field in typeDef.fields!) {
+          _write(' (field \$${field.name} ');
+          if (field.isMutable) {
+            _write('(mut ${_convertGCType(field.type)})');
+          } else {
+            _write(_convertGCType(field.type));
+          }
+          _write(')');
+        }
+        _writeLine('))');
+      } else if (typeDef.isArray) {
+        final elemType = typeDef.elementType!;
+        final mut = typeDef.isMutableElement ? 'mut ' : '';
+        _writeLine('(type \$${typeDef.name} (array ($mut${_convertGCType(elemType)})))');
+      }
+    }
+    
+    if (module.typeDefinitions.isNotEmpty) {
+      _writeLine();
+    }
+  }
+
+  String _convertGCType(IrType type) {
+    // Convert IR type to WAT GC type
+    if (type.isReference) {
+      if (type.isNullable) {
+        return '(ref null \$${type.name})';
+      } else {
+        return '(ref \$${type.name})';
+      }
+    }
+    return _convertType(type);
   }
 
   void _generateGlobal(IrGlobal global) {

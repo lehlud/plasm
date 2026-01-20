@@ -6,15 +6,14 @@ import 'analysis/type_analysis.dart';
 import 'ir/ir_builder.dart';
 import 'ir/visitor.dart';
 import 'codegen/wat_generator.dart';
-import 'codegen/wat_generator_gc.dart';
 
 /// Compiler pipeline orchestration
+/// Always uses WebAssembly GC for memory management
 class Compiler {
   final List<String> errors = [];
   final bool verbose;
-  final bool useGC;
 
-  Compiler({this.verbose = false, this.useGC = true});
+  Compiler({this.verbose = false});
 
   /// Compile a Plasm source file to WASM
   Future<bool> compile(String sourcePath, String outputPath) async {
@@ -104,7 +103,7 @@ class Compiler {
       
       if (verbose) {
         print('Generated IR module: $moduleName');
-        print('Using ${useGC ? "GC" : "linear memory"} mode');
+        print('Using WebAssembly GC for automatic memory management');
         print('\nIR Dump:');
         print(irBuilder.module.toString());
       }
@@ -119,18 +118,12 @@ class Compiler {
         print('Ran optimization passes');
       }
 
-      // Generate WAT (choose GC or non-GC generator)
-      final String watCode;
-      if (useGC) {
-        final watGenerator = WatGeneratorGC(irBuilder.module, useGC: true);
-        watCode = watGenerator.generate();
-      } else {
-        final watGenerator = WatGenerator(irBuilder.module);
-        watCode = watGenerator.generate();
-      }
+      // Generate WAT with GC support
+      final watGenerator = WatGenerator(irBuilder.module);
+      final watCode = watGenerator.generate();
       
       if (verbose) {
-        print('\nGenerated WAT (${useGC ? "with GC" : "linear memory"}):');
+        print('\nGenerated WAT (with GC):');
         print(watCode);
       }
 
@@ -169,12 +162,12 @@ class Compiler {
 
   Future<bool> _runWat2Wasm(String watPath, String wasmPath) async {
     try {
-      // Try to run wat2wasm
+      // Try to run wat2wasm with GC support enabled
       final result = await Process.run('wat2wasm', [
         watPath,
         '-o',
         wasmPath,
-        if (useGC) '--enable-gc',  // Enable GC features in wat2wasm
+        '--enable-gc',  // Always enable GC features in wat2wasm
       ]);
       
       if (result.exitCode == 0) {
