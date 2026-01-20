@@ -1,0 +1,61 @@
+// Standard library: Map module
+// Provides abstract key-value map functionality
+
+// Generic Map class with key-value storage
+pub class Map<K, V> {
+  // Internal storage (implementation detail)
+  // In a real implementation, this would use a hash table or tree
+  
+  pub constructor() {
+    // Initialize empty map
+    // Actual implementation would allocate internal storage
+    self.$__init();
+  }
+  
+  // Insert or update a key-value pair
+  pub proc $put(K key, V value) void {
+    self.$__external_map_put(key, value);
+  }
+  
+  // Get value by key, returns tuple (value, exists)
+  pub fn get(K key) (V, bool) {
+    return self.__external_map_get(key);
+  }
+  
+  // Check if key exists in map
+  pub fn contains(K key) bool {
+    final value, exists = self.get(key);
+    return exists;
+  }
+  
+  // Remove a key from the map
+  pub proc $remove(K key) void {
+    self.$__external_map_remove(key);
+  }
+  
+  // Get size of the map
+  pub fn size() u64 {
+    return self.__external_map_size();
+  }
+  
+  // Clear all entries from the map
+  pub proc $clear() void {
+    self.$__external_map_clear();
+  }
+  
+  // Resolve is an alias for get (as used in fib.plasm example)
+  pub fn resolve(K key) (V, bool) {
+    return self.get(key);
+  }
+  
+  // Internal external bindings (not exported)
+  proc $__init() void {}
+  proc $__external_map_put(K key, V value) void {}
+  fn __external_map_get(K key) (V, bool) { 
+    final defaultVal = 0;
+    return (defaultVal, false); 
+  }
+  proc $__external_map_remove(K key) void {}
+  fn __external_map_size() u64 { return 0; }
+  proc $__external_map_clear() void {}
+}

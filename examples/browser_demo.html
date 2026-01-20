@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plasm WebAssembly Demo</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #1e1e1e;
+      color: #d4d4d4;
+    }
+    h1 {
+      color: #4ec9b0;
+    }
+    #console {
+      background: #000;
+      color: #0f0;
+      padding: 20px;
+      border-radius: 5px;
+      min-height: 300px;
+      font-family: 'Courier New', monospace;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    button {
+      background: #4ec9b0;
+      color: #1e1e1e;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px 5px;
+      border-radius: 3px;
+    }
+    button:hover {
+      background: #6fd9c0;
+    }
+    .info {
+      background: #264f78;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Plasm WebAssembly Demo</h1>
+  
+  <div class="info">
+    <strong>Instructions:</strong>
+    <ol>
+      <li>Compile your Plasm code: <code>dart run bin/plasm.dart myapp.plasm myapp.wasm</code></li>
+      <li>Place the .wasm file in the same directory as this HTML file</li>
+      <li>Click "Load & Run Module" to execute</li>
+    </ol>
+  </div>
+
+  <div>
+    <button onclick="loadAndRun()">Load & Run Module</button>
+    <button onclick="clearConsole()">Clear Console</button>
+  </div>
+
+  <h2>Output:</h2>
+  <div id="console"></div>
+
+  <script src="stdlib.js"></script>
+  <script>
+    const consoleDiv = document.getElementById('console');
+    
+    // Override console methods to capture output
+    const originalLog = console.log;
+    console.log = function(...args) {
+      originalLog.apply(console, args);
+      consoleDiv.textContent += args.join(' ') + '\n';
+      consoleDiv.scrollTop = consoleDiv.scrollHeight;
+    };
+
+    async function loadAndRun() {
+      consoleDiv.textContent = '> Loading module...\n';
+      
+      try {
+        // Create runtime instance
+        const runtime = new PlasmRuntime();
+        
+        // Load the WASM module
+        // Change 'myapp.wasm' to your compiled module name
+        await runtime.loadModule('myapp.wasm');
+        
+        console.log('> Module loaded successfully');
+        console.log('> Running $main...\n');
+        
+        // Call the main function
+        // Adjust function name as needed
+        try {
+          runtime.call('main');
+        } catch (e) {
+          // Module might have already run via start function
+          console.log('> Execution complete');
+        }
+        
+        console.log('\n> Done!');
+        
+      } catch (error) {
+        console.log('> Error: ' + error.message);
+        console.log('> Stack: ' + error.stack);
+      }
+    }
+
+    function clearConsole() {
+      consoleDiv.textContent = '';
+    }
+
+    // Show initial message
+    consoleDiv.textContent = '> Ready. Click "Load & Run Module" to start.\n';
+  </script>
+</body>
+</html>
