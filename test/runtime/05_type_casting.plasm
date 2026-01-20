@@ -1,0 +1,15 @@
+// Type casting test
+fn testCasts() u64 {
+  final u8 small = 10;
+  final u64 large = small;  // Implicit upcast
+  
+  final u64 big = 1000;
+  final u8 tiny = big as u8;  // Explicit downcast
+  
+  return large;
+}
+
+pub proc $main() void {
+  final result = testCasts();
+  // Result: 10
+}

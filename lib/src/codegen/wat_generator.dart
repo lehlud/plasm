@@ -329,10 +329,8 @@ class WatGenerator {
     
     // If this instruction has no users and returns a value, add drop
     // This handles void procedure calls that invoke non-void functions
-    if (instruction.type != null && instruction.type!.name != 'void') {
-      // Check if the result is actually used
-      // For now, we conservatively don't add drop as the IR should handle this
-      // TODO: Add proper liveness analysis to determine if drop is needed
+    if (instruction.type != null && instruction.type!.name != 'void' && instruction.users.isEmpty) {
+      _writeLine('drop');
     }
   }
 

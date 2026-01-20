@@ -1,0 +1,4 @@
+// Basic hello world test
+pub proc $main() void {
+  // This is a placeholder - actual stdlib/io integration pending
+}

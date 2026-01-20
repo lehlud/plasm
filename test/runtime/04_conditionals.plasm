@@ -1,0 +1,20 @@
+// Conditional logic test
+fn max(u64 a, u64 b) u64 {
+  if (a > b) {
+    return a;
+  }
+  return b;
+}
+
+fn min(u64 a, u64 b) u64 {
+  if (a < b) {
+    return a;
+  }
+  return b;
+}
+
+pub proc $main() void {
+  final maximum = max(42, 17);
+  final minimum = min(42, 17);
+  // Results: maximum=42, minimum=17
+}
