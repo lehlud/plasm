@@ -96,6 +96,7 @@ class TypeAnalyzer implements AstVisitor {
   final List<String> errors = [];
   TypeEnvironment _env;
   final Map<AstNode, PlasmType> _nodeTypes = {};
+  final Map<String, PlasmType> _functionReturnTypes = {};
   PlasmType? _currentFunctionReturnType;
 
   TypeAnalyzer() : _env = TypeEnvironment();
@@ -180,9 +181,11 @@ class TypeAnalyzer implements AstVisitor {
 
   @override
   void visitFunctionDecl(FunctionDecl node) {
+    final returnType = _resolveTypeSpec(node.returnType);
+    _functionReturnTypes[node.name] = returnType;
+    
     _enterScope();
 
-    final returnType = _resolveTypeSpec(node.returnType);
     _currentFunctionReturnType = returnType;
 
     for (final param in node.parameters) {
@@ -201,9 +204,11 @@ class TypeAnalyzer implements AstVisitor {
 
   @override
   void visitProcedureDecl(ProcedureDecl node) {
+    final returnType = _resolveTypeSpec(node.returnType);
+    _functionReturnTypes[node.name] = returnType;
+    
     _enterScope();
 
-    final returnType = _resolveTypeSpec(node.returnType);
     _currentFunctionReturnType = returnType;
 
     for (final param in node.parameters) {
@@ -517,9 +522,18 @@ class TypeAnalyzer implements AstVisitor {
         arg.accept(this);
       }
       
-      // For now, assume function returns void
-      // Full implementation would look up function signature
-      _setType(node, PlasmType.void_);
+      // Look up function return type
+      if (node.callee is IdentifierExpr) {
+        final funcName = (node.callee as IdentifierExpr).name;
+        final returnType = _functionReturnTypes[funcName];
+        if (returnType != null) {
+          _setType(node, returnType);
+        } else {
+          _setType(node, PlasmType.void_);
+        }
+      } else {
+        _setType(node, PlasmType.void_);
+      }
     } else if (node is MemberAccessExpr) {
       node.object.accept(this);
       // Type would be determined by the member being accessed

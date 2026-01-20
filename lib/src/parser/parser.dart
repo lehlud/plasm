@@ -827,14 +827,6 @@ class Parser {
 
     if (_match([TokenType.identifier])) {
       final name = _previous().lexeme;
-      
-      // Constructor call
-      if (_match([TokenType.lparen])) {
-        final arguments = _parseArgumentList();
-        _consume(TokenType.rparen, 'Expected ) after arguments');
-        return ConstructorCallExpr(name, arguments, line, column);
-      }
-      
       return IdentifierExpr(name, line, column);
     }
 
