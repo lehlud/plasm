@@ -2,12 +2,6 @@ import 'package:plasm/plasm.dart';
 import 'package:test/test.dart';
 
 void main() {
-  // Ensure tests complete properly
-  tearDownAll(() async {
-    // Give time for any pending async operations to complete
-    await Future.delayed(Duration(milliseconds: 100));
-  });
-
   group('Lexer tests', () {
     test('tokenize simple program', () {
       final source = '''
@@ -16,10 +10,10 @@ void main() {
           return a + b;
         }
       ''';
-      
+
       final lexer = Lexer(source);
       final tokens = lexer.tokenize();
-      
+
       expect(tokens.isNotEmpty, true);
       expect(lexer.errors.isEmpty, true);
     });
@@ -28,12 +22,12 @@ void main() {
   group('Parser tests', () {
     test('parse const declaration', () {
       final source = 'const x = 42;';
-      
+
       final lexer = Lexer(source);
       final tokens = lexer.tokenize();
       final parser = Parser(tokens);
       final ast = parser.parse();
-      
+
       expect(ast.declarations.length, 1);
       expect(ast.declarations[0], isA<ConstDecl>());
       expect(parser.errors.isEmpty, true);
@@ -45,12 +39,12 @@ void main() {
           return a + b;
         }
       ''';
-      
+
       final lexer = Lexer(source);
       final tokens = lexer.tokenize();
       final parser = Parser(tokens);
       final ast = parser.parse();
-      
+
       expect(ast.declarations.length, 1);
       expect(ast.declarations[0], isA<FunctionDecl>());
       expect(parser.errors.isEmpty, true);
@@ -64,15 +58,15 @@ void main() {
           return x;
         }
       ''';
-      
+
       final lexer = Lexer(source);
       final tokens = lexer.tokenize();
       final parser = Parser(tokens);
       final ast = parser.parse();
-      
+
       final analyzer = NameAnalyzer();
       analyzer.analyze(ast);
-      
+
       expect(analyzer.errors.isNotEmpty, true);
       expect(analyzer.errors.any((e) => e.contains('Undefined')), true);
     });
@@ -84,15 +78,15 @@ void main() {
           return x;
         }
       ''';
-      
+
       final lexer = Lexer(source);
       final tokens = lexer.tokenize();
       final parser = Parser(tokens);
       final ast = parser.parse();
-      
+
       final analyzer = NameAnalyzer();
       analyzer.analyze(ast);
-      
+
       expect(analyzer.errors.isEmpty, true);
     });
   });
@@ -104,15 +98,15 @@ void main() {
           return 42;
         }
       ''';
-      
+
       final lexer = Lexer(source);
       final tokens = lexer.tokenize();
       final parser = Parser(tokens);
       final ast = parser.parse();
-      
+
       final typeAnalyzer = TypeAnalyzer();
       typeAnalyzer.analyze(ast);
-      
+
       // Print errors for debugging
       if (typeAnalyzer.errors.isNotEmpty) {
         print('Type analysis errors:');
@@ -120,7 +114,7 @@ void main() {
           print('  $error');
         }
       }
-      
+
       expect(typeAnalyzer.errors.isEmpty, true);
     });
   });
