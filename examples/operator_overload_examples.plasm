@@ -4,8 +4,8 @@ import stdlib/io;
 
 // Example 1: Vector class with operator overloading
 class Vector2D {
-  f64 x;
-  f64 y;
+  final f64 x;
+  final f64 y;
   
   constructor(f64 x, f64 y) {
     self.x = x;
@@ -43,8 +43,8 @@ class Vector2D {
 
 // Example 2: Complex number class
 class Complex {
-  f64 real;
-  f64 imag;
+  final f64 real;
+  final f64 imag;
   
   constructor(f64 real, f64 imag) {
     self.real = real;
@@ -87,8 +87,8 @@ class Complex {
 
 // Example 3: Fraction class with comparison operators
 class Fraction {
-  i64 numerator;
-  i64 denominator;
+  final i64 numerator;
+  final i64 denominator;
   
   constructor(i64 num, i64 denom) {
     self.numerator = num;

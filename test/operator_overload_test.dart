@@ -6,8 +6,8 @@ void main() {
     test('parse class with operator+ overload', () {
       final source = '''
         class Point {
-          u64 x;
-          u64 y;
+          final u64 x;
+          final u64 y;
           
           op(+) (Point other) Point {
             // Note: Returns self for testing (proper constructors not yet supported)
@@ -35,7 +35,7 @@ void main() {
     test('parse multiple operator overloads', () {
       final source = '''
         class Vector {
-          u64 x;
+          final u64 x;
           
           op(+) (Vector other) Vector {
             return self;
@@ -68,7 +68,7 @@ void main() {
     test('parse comparison operators', () {
       final source = '''
         class Value {
-          u64 val;
+          final u64 val;
           
           op(<) (Value other) bool {
             return val < other.val;
@@ -107,12 +107,10 @@ void main() {
     test('analyze operator overload types', () {
       final source = '''
         class Point {
-          u64 x;
-          u64 y;
+          final u64 x;
+          final u64 y;
           
           op(+) (Point other) Point {
-            final u64 newX = x + other.x;
-            final u64 newY = y + other.y;
             // Return self for now (proper constructor support needed)
             return self;
           }
@@ -144,10 +142,10 @@ void main() {
     test('use operator overload in binary expression', () {
       final source = '''
         class Point {
-          u64 x;
+          final u64 x;
           
           op(+) (Point other) Point {
-            return Point();
+            return self;
           }
         }
         
@@ -175,7 +173,7 @@ void main() {
     test('validate operator parameter type', () {
       final source = '''
         class Point {
-          u64 x;
+          final u64 x;
           
           op(+) (Point other) Point {
             return self;
@@ -205,8 +203,8 @@ void main() {
     test('build IR for operator overload', () {
       final source = '''
         class Point {
-          u64 x;
-          u64 y;
+          final u64 x;
+          final u64 y;
           
           op(+) (Point other) Point {
             return self;
@@ -237,7 +235,7 @@ void main() {
     test('build IR for using operator overload', () {
       final source = '''
         class Point {
-          u64 x;
+          final u64 x;
           
           op(+) (Point other) Point {
             return self;
