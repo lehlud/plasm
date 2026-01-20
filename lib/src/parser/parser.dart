@@ -754,8 +754,9 @@ class Parser {
       return UnaryExpr(op, expr, line, column);
     }
 
-    // Cast expression
-    if (_match([TokenType.lparen]) && _lookaheadTypeSpec()) {
+    // Cast expression - check lookahead BEFORE consuming the (
+    if (_check(TokenType.lparen) && _lookaheadTypeSpec()) {
+      _advance(); // Now consume the (
       final line = _previous().line;
       final column = _previous().column;
       final type = _parseTypeSpec();
@@ -987,7 +988,11 @@ class Parser {
 
   bool _lookaheadTypeSpec() {
     // Simple lookahead to check if this looks like a type spec
+    // Skip the opening ( if we're checking for a cast
     final saved = _current;
+    if (_check(TokenType.lparen)) {
+      _advance(); // Skip the (
+    }
     final isType = _isPrimitiveType(_peek()) || 
                    _check(TokenType.identifier) ||
                    _check(TokenType.void_) ||
