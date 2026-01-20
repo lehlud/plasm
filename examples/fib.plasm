@@ -1,0 +1,99 @@
+import stdlib/io; // imports are allowed; this is a 'global' import
+// this would be a relative ('local') import: import ./utils;
+
+import stdlib/map; // imports must be at the top of any module
+
+const fibZero = 0; // const is similar to a #define in C: it gets inserted where referenced.
+// note that functions (fn) may not use global non-const variables, as functions are
+// required to always return the same value for the same input
+// that is also why const does not allow for a type to be specified (contrary to 'final', because the
+// inferred type may be different each time)
+
+fn fib(u64 n) u64 { // functions must not start with a dollar sign and
+					// must not return 'void' (because then they would be pointless in the after all)
+
+	if (n <= 1) return n;
+	return fib(n - 1) + fib(n - 2);
+}
+
+fn fibCallback(u64 n) (u64) => u64 {
+	// this binds the outer variable n per value inside the lambda function
+	return @(u64 k) => fib(n + k);
+
+	// this would be equivalent:
+	return @(u64 k) {
+		final param = n + k; // 'final' assumes the rhs type to be the lhs type
+		// final u64 param = ... would have been equivalent
+		// let param = ... would be the mutable version of the above declaration (lhs type also optional)
+
+		return fib(param);
+	};
+}
+
+
+// there exist classes.
+// classes may have static and non-static members.
+// classes always have at least 1 constructor (that may be overloaded).
+// classes may be instiantiated using the constructor.
+// instances are essentially just pointers that can be used to invoke procs defined on them (non-static only)
+// all class members are private unless declared otherwise ('pub', 'prot' (inheritance-public, otherwise private))
+class FibCalc {
+	final Map<u64, u64> cache; // generic parameters are inferred here
+
+	pub constructor() { // constructors behave similar to functions, with the difference that
+					// - they have access to the 'self' object (which is the same as 'this' in other languages)
+					// - they are allowed to and always return void (implicity; no explicit option)
+					// note that the 'self' object does not contain the static members within its namespace (e.g. self.$foo is not defined)
+
+		self.cache = Map(); // generic parameters are inferred here; there's no 'new' keyword
+		// ..      = Map<u64, u64>(); would have been equivalent
+	}
+	
+	// note that classes are not allowed to have non-static functions
+	// (because functions must always return the same value for the same input)
+	// (that is also why functions are only allowed to receive primitive data types
+	//  as input: no function types, no objects)
+	pub proc $calc(u64 n) {
+		if n <= 1 { // if braces are used in 'if' and 'while', no parentheses around the condition are required.
+			return n
+		}
+
+		final cached, isInCache = cache.resolve(n); // functions and procs may return any specifyable type (including tuples)
+													// note that objects are allowed to be returned because they must be instantiated
+													// within the function (because they cant be passed), so they have to look the same
+													// after every call with the same input params
+
+		if (isInCache) return cached;
+
+		return self.calc(n - 1) + self.calc(n - 2);
+	}
+
+	pub proc $calc(u32 n) { // function/proc overloading is allowed
+		return calc((u64) n);
+	}
+
+
+	// operators may be overloaded (put the operator in parentheses)
+	// overloaded operators are always procedures, meaning they cannot be
+	// used within
+	pub op (==) (any other) bool { // the 'any' type refers to any other type (it is not a primitive type and cannot be used as a parameter for functions)
+		// 'false' and 'true' are the boolean literals
+		// ... is ... can be used to check the types (native + instances)
+		// (for native types, this is achieved by wrapping them in the (implicit or explicit) cast to 'any')
+		if (other is u64) return false;
+
+		if (other is FibCalc) return true;
+
+		return false;
+	}
+
+	static proc $foo() void {}
+}
+
+// note that procs must start with a dollar sign; also 'main' must be public in order to be callable from the outside
+// this also means that 'fib' and 'fibCallback' are non-public and not exported outside of the module
+pub proc $main() void {
+	// string interpolation and proc call (which is only allowed inside another proc call!)
+	io.$println("fib(10) = ${fib(10)}"); 
+}
+
