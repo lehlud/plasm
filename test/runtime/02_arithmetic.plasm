@@ -1,0 +1,14 @@
+// Arithmetic operations test
+fn add(u64 a, u64 b) u64 {
+  return a + b;
+}
+
+fn multiply(u64 a, u64 b) u64 {
+  return a * b;
+}
+
+pub proc $main() void {
+  final sum = add(10, 20);
+  final product = multiply(5, 6);
+  // Results: sum=30, product=30
+}

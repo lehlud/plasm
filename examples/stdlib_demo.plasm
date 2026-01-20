@@ -1,0 +1,45 @@
+// Example: Using stdlib/io and stdlib/map
+
+import stdlib/io;
+import stdlib/map;
+
+const MESSAGE = "Fibonacci Calculator";
+
+fn fib(u64 n) u64 {
+  if (n <= 1) {
+    return n;
+  }
+  return fib(n - 1) + fib(n - 2);
+}
+
+pub proc $main() void {
+  io.$println(MESSAGE);
+  io.$println("====================");
+  
+  // Create a cache for fibonacci numbers
+  final cache = Map<u64, u64>();
+  
+  // Calculate some fibonacci numbers
+  let i = 0;
+  while (i <= 10) {
+    final result = fib(i);
+    cache.$put(i, result);
+    io.$print("fib(");
+    io.$print(i);
+    io.$print(") = ");
+    io.$println(result);
+    i = i + 1;
+  }
+  
+  io.$println("");
+  io.$println("Cache statistics:");
+  io.$print("  Size: ");
+  io.$println(cache.size());
+  
+  // Look up a cached value
+  final value, exists = cache.resolve(5);
+  if (exists) {
+    io.$print("  fib(5) from cache: ");
+    io.$println(value);
+  }
+}

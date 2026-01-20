@@ -1,0 +1,12 @@
+// Recursive fibonacci test
+fn fib(u64 n) u64 {
+  if (n <= 1) {
+    return n;
+  }
+  return fib(n - 1) + fib(n - 2);
+}
+
+pub proc $main() void {
+  final result = fib(10);
+  // Result: 55
+}

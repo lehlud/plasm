@@ -1,0 +1,30 @@
+// Standard library: I/O module
+// Provides basic console I/O functionality
+
+// External bindings (implemented in host environment)
+// These are declared as external functions that will be provided
+// by the WebAssembly host (browser via stdlib.js or WASI)
+
+// Print a string to console with newline
+pub proc $println(any value) void {
+  // This is a binding to the host environment
+  // The actual implementation will be in stdlib.js or WASI
+  // For now, we mark this as an external call
+  $__external_println(value);
+}
+
+// Print a string to console without newline
+pub proc $print(any value) void {
+  $__external_print(value);
+}
+
+// Read a line from console (returns string)
+pub fn readLine() any {
+  return $__external_readLine();
+}
+
+// Internal external bindings (not exported)
+// These will be linked to host functions
+proc $__external_println(any value) void {}
+proc $__external_print(any value) void {}
+fn __external_readLine() any { return 0; }
