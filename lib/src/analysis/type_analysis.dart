@@ -191,7 +191,13 @@ class TypeAnalyzer implements AstVisitor {
   TypeEnvironment _env;
   final Map<AstNode, PlasmType> _nodeTypes = {};
   final Map<String, PlasmType> _functionReturnTypes = {};
-  final Map<String, Map<String, OperatorDecl>> _classOperators = {}; // className -> {operator -> OperatorDecl}
+  
+  /// Maps class names to their operator overloads.
+  /// Structure: className -> {operator -> OperatorDecl}
+  /// Used during binary expression type checking to lookup operator overloads
+  /// before falling back to default operator behavior.
+  final Map<String, Map<String, OperatorDecl>> _classOperators = {};
+  
   PlasmType? _currentFunctionReturnType;
   String? _currentClassName;
 

@@ -525,9 +525,8 @@ class IrBuilder {
   }
 
   IrValue? _buildLambdaExpr(LambdaExpr expr) {
-    // Generate a unique name for the lambda function
-    static int lambdaCounter = 0;
-    final lambdaName = '__lambda_${lambdaCounter++}';
+    // Generate a unique name for the lambda function using instance counter
+    final lambdaName = '__lambda_${_nextValueId++}';
 
     // Save current function and block state
     final savedFunction = _currentFunction;
@@ -607,8 +606,10 @@ class IrBuilder {
   }
 
   IrValue? _buildArrayLiteralExpr(ArrayLiteralExpr expr) {
-    // For now, create an array and set each element
-    // This is simplified; a full implementation would optimize this
+    // NOTE: This implementation creates each element individually,
+    // which could be inefficient for large arrays. A more efficient approach
+    // would be to use array.new with a function that initializes elements,
+    // but this requires more sophisticated code generation.
     if (expr.elements.isEmpty) {
       return _createInstruction(IrOpcode.arrayNewDefault, 
         [IrConstant(_nextValueId++, 0, IrType.i32)],
