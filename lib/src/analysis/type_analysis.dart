@@ -37,6 +37,73 @@ class PlasmType {
     return name == 'f32' || name == 'f64';
   }
 
+  bool isUnsigned() {
+    return name == 'u8' || name == 'u16' || name == 'u32' || name == 'u64';
+  }
+
+  bool isSigned() {
+    return name == 'i8' || name == 'i16' || name == 'i32' || name == 'i64';
+  }
+
+  int getBitWidth() {
+    switch (name) {
+      case 'u8':
+      case 'i8':
+        return 8;
+      case 'u16':
+      case 'i16':
+        return 16;
+      case 'u32':
+      case 'i32':
+      case 'f32':
+        return 32;
+      case 'u64':
+      case 'i64':
+      case 'f64':
+        return 64;
+      default:
+        return 0;
+    }
+  }
+
+  /// Check if this type can be implicitly upcast to another type
+  /// Rules:
+  /// - Unsigned to larger unsigned: u8->u16->u32->u64
+  /// - Unsigned to larger signed: u8->i16, u16->i32, u32->i64
+  /// - Signed to larger signed: i8->i16->i32->i64
+  /// - NOT allowed: u64->i64, signed to unsigned, larger to smaller
+  bool canImplicitlyUpcastTo(PlasmType other) {
+    if (name == other.name) return true;
+    if (name == 'any' || other.name == 'any') return true;
+
+    // Unsigned to larger unsigned
+    if (isUnsigned() && other.isUnsigned()) {
+      return getBitWidth() < other.getBitWidth();
+    }
+
+    // Unsigned to larger signed (with room for sign bit)
+    if (isUnsigned() && other.isSigned()) {
+      return getBitWidth() < other.getBitWidth();
+    }
+
+    // Signed to larger signed
+    if (isSigned() && other.isSigned()) {
+      return getBitWidth() < other.getBitWidth();
+    }
+
+    // Integer to float (may lose precision, but allowed)
+    if (isInteger() && other.isFloatingPoint()) {
+      return getBitWidth() <= other.getBitWidth();
+    }
+
+    // f32 to f64
+    if (name == 'f32' && other.name == 'f64') {
+      return true;
+    }
+
+    return false;
+  }
+
   bool isCompatibleWith(PlasmType other) {
     if (name == 'any' || other.name == 'any') return true;
     if (name != other.name) return false;
@@ -266,8 +333,9 @@ class TypeAnalyzer implements AstVisitor {
       final initType = _nodeTypes[node.initializer];
       
       if (fieldType != null && initType != null) {
-        if (!initType.isCompatibleWith(fieldType)) {
-          _error('Type mismatch: expected $fieldType but got $initType', 
+        // Allow implicit upcasting
+        if (!initType.canImplicitlyUpcastTo(fieldType) && !initType.isCompatibleWith(fieldType)) {
+          _error('Type mismatch: cannot assign $initType to $fieldType (no implicit conversion available)', 
                  node.line, node.column);
         }
       } else if (fieldType == null) {
@@ -351,8 +419,9 @@ class TypeAnalyzer implements AstVisitor {
         final initType = _nodeTypes[binding.initializer];
         
         if (varType != null && initType != null) {
-          if (!initType.isCompatibleWith(varType)) {
-            _error('Type mismatch: expected $varType but got $initType', 
+          // Allow implicit upcasting
+          if (!initType.canImplicitlyUpcastTo(varType) && !initType.isCompatibleWith(varType)) {
+            _error('Type mismatch: cannot assign $initType to $varType (no implicit conversion available)', 
                    node.line, node.column);
           }
         } else if (varType == null) {

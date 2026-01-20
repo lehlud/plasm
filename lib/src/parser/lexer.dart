@@ -19,6 +19,8 @@ enum TokenType {
   return_,
   self_,
   is_,
+  as_,
+  new_,
   any,
   void_,
   
@@ -124,6 +126,8 @@ class Lexer {
     'return': TokenType.return_,
     'self': TokenType.self_,
     'is': TokenType.is_,
+    'as': TokenType.as_,
+    'new': TokenType.new_,
     'any': TokenType.any,
     'void': TokenType.void_,
     'u8': TokenType.u8,

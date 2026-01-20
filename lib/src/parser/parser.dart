@@ -560,9 +560,8 @@ class Parser {
       value = _parseExpression();
     }
 
-    if (_check(TokenType.semicolon)) {
-      _advance();
-    }
+    // Semicolon is now required
+    _consume(TokenType.semicolon, 'Expected ; after return statement');
 
     return ReturnStatement(value, line, column);
   }
@@ -577,9 +576,8 @@ class Parser {
       return null;
     }
 
-    if (_check(TokenType.semicolon)) {
-      _advance();
-    }
+    // Semicolon is now required
+    _consume(TokenType.semicolon, 'Expected ; after expression statement');
 
     return ExpressionStatement(expr, line, column);
   }
@@ -690,6 +688,18 @@ class Parser {
       expr = IsExpr(expr!, type, line, column);
     }
 
+    // Handle 'as' operator (explicit cast)
+    if (_match([TokenType.as_])) {
+      final line = _previous().line;
+      final column = _previous().column;
+      final type = _parseTypeSpec();
+      if (type == null) {
+        _error('Expected type after as');
+        return expr;
+      }
+      expr = CastExpr(type, expr!, line, column);
+    }
+
     return expr;
   }
 
@@ -780,6 +790,17 @@ class Parser {
           _error('Expected member name after .');
           return expr;
         }
+      } else if (_match([TokenType.lbracket])) {
+        // Array indexing
+        final line = _previous().line;
+        final column = _previous().column;
+        final index = _parseExpression();
+        if (index == null) {
+          _error('Expected index expression');
+          return expr;
+        }
+        _consume(TokenType.rbracket, 'Expected ] after array index');
+        expr = ArrayIndexExpr(expr!, index, line, column);
       } else if (_match([TokenType.lparen])) {
         final line = _previous().line;
         final column = _previous().column;
@@ -823,6 +844,50 @@ class Parser {
         }
       }
       return SelfExpr(line, column);
+    }
+
+    // Array allocation: new Type[size]
+    if (_match([TokenType.new_])) {
+      final newLine = _previous().line;
+      final newColumn = _previous().column;
+      
+      final type = _parseTypeSpec();
+      if (type == null) {
+        _error('Expected type after new');
+        return null;
+      }
+      
+      if (_match([TokenType.lbracket])) {
+        final sizeExpr = _parseExpression();
+        if (sizeExpr == null) {
+          _error('Expected size expression for array allocation');
+          return null;
+        }
+        _consume(TokenType.rbracket, 'Expected ] after array size');
+        return ArrayAllocationExpr(type, sizeExpr, newLine, newColumn);
+      } else {
+        _error('Expected [ after type in array allocation');
+        return null;
+      }
+    }
+
+    // Array literal: [expr, expr, ...]
+    if (_match([TokenType.lbracket])) {
+      final bracketLine = _previous().line;
+      final bracketColumn = _previous().column;
+      
+      final elements = <Expression>[];
+      if (!_check(TokenType.rbracket)) {
+        do {
+          final expr = _parseExpression();
+          if (expr != null) {
+            elements.add(expr);
+          }
+        } while (_match([TokenType.comma]));
+      }
+      
+      _consume(TokenType.rbracket, 'Expected ] after array elements');
+      return ArrayLiteralExpr(elements, bracketLine, bracketColumn);
     }
 
     if (_match([TokenType.identifier])) {

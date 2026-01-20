@@ -442,3 +442,29 @@ class ConstructorCallExpr extends Expression {
   ConstructorCallExpr(this.className, this.arguments, int line, int column)
       : super(line, column);
 }
+
+/// Array allocation expression (new Type[size])
+class ArrayAllocationExpr extends Expression {
+  final TypeSpec elementType;
+  final Expression size;
+
+  ArrayAllocationExpr(this.elementType, this.size, int line, int column)
+      : super(line, column);
+}
+
+/// Array index expression (array[index])
+class ArrayIndexExpr extends Expression {
+  final Expression array;
+  final Expression index;
+
+  ArrayIndexExpr(this.array, this.index, int line, int column)
+      : super(line, column);
+}
+
+/// Array literal expression ([1, 2, 3])
+class ArrayLiteralExpr extends Expression {
+  final List<Expression> elements;
+
+  ArrayLiteralExpr(this.elements, int line, int column)
+      : super(line, column);
+}

@@ -1,25 +1,92 @@
 // Standard library: Map module
 // Provides abstract key-value map functionality
+// Purely implemented in Plasm using arrays (no external bindings)
 
-// Generic Map class with key-value storage
+// Simple hash map implementation using linear probing
 pub class Map<K, V> {
-  // Internal storage (implementation detail)
-  // In a real implementation, this would use a hash table or tree
+  // Internal storage arrays
+  let u64[] hashes;
+  let K[] keys;
+  let V[] values;
+  let bool[] occupied;
+  let u64 count;
+  let u64 capacity;
   
   pub constructor() {
-    // Initialize empty map
-    // Actual implementation would allocate internal storage
-    self.$__init();
+    // Initialize with default capacity
+    self.$initWithCapacity(16);
+  }
+  
+  // Initialize with specific capacity
+  proc $initWithCapacity(u64 cap) void {
+    self.capacity = cap;
+    self.count = 0;
+    self.hashes = new u64[cap];
+    self.keys = new K[cap];
+    self.values = new V[cap];
+    self.occupied = new bool[cap];
+    
+    // Initialize occupied array to false
+    let i = 0;
+    while (i < cap) {
+      self.occupied[i] = false;
+      i = i + 1;
+    }
+  }
+  
+  // Simple hash function for u64 keys
+  fn hashKey(K key) u64 {
+    // For now, assume K can be cast to u64
+    // In a real implementation, we'd have proper hash functions per type
+    return (key as u64) % self.capacity;
   }
   
   // Insert or update a key-value pair
   pub proc $put(K key, V value) void {
-    self.$__external_map_put(key, value);
+    // Check if we need to resize
+    if (self.count * 2 >= self.capacity) {
+      self.$resize(self.capacity * 2);
+    }
+    
+    let hash = self.hashKey(key);
+    let index = hash;
+    
+    // Linear probing to find empty slot or existing key
+    while (self.occupied[index]) {
+      if (self.keys[index] == key) {
+        // Update existing value
+        self.values[index] = value;
+        return;
+      }
+      index = (index + 1) % self.capacity;
+    }
+    
+    // Insert new entry
+    self.hashes[index] = hash;
+    self.keys[index] = key;
+    self.values[index] = value;
+    self.occupied[index] = true;
+    self.count = self.count + 1;
   }
   
   // Get value by key, returns tuple (value, exists)
   pub fn get(K key) (V, bool) {
-    return self.__external_map_get(key);
+    let hash = self.hashKey(key);
+    let index = hash;
+    let probes = 0;
+    
+    // Linear probing to find key
+    while (self.occupied[index] && probes < self.capacity) {
+      if (self.keys[index] == key) {
+        return (self.values[index], true);
+      }
+      index = (index + 1) % self.capacity;
+      probes = probes + 1;
+    }
+    
+    // Key not found
+    final V defaultVal = 0 as V;
+    return (defaultVal, false);
   }
   
   // Check if key exists in map
@@ -30,32 +97,74 @@ pub class Map<K, V> {
   
   // Remove a key from the map
   pub proc $remove(K key) void {
-    self.$__external_map_remove(key);
+    let hash = self.hashKey(key);
+    let index = hash;
+    let probes = 0;
+    
+    // Linear probing to find key
+    while (self.occupied[index] && probes < self.capacity) {
+      if (self.keys[index] == key) {
+        self.occupied[index] = false;
+        self.count = self.count - 1;
+        return;
+      }
+      index = (index + 1) % self.capacity;
+      probes = probes + 1;
+    }
   }
   
   // Get size of the map
   pub fn size() u64 {
-    return self.__external_map_size();
+    return self.count;
   }
   
   // Clear all entries from the map
   pub proc $clear() void {
-    self.$__external_map_clear();
+    let i = 0;
+    while (i < self.capacity) {
+      self.occupied[i] = false;
+      i = i + 1;
+    }
+    self.count = 0;
   }
   
-  // Resolve is an alias for get (as used in fib.plasm example)
+  // Resize internal arrays
+  proc $resize(u64 newCapacity) void {
+    // Save old arrays
+    final oldHashes = self.hashes;
+    final oldKeys = self.keys;
+    final oldValues = self.values;
+    final oldOccupied = self.occupied;
+    final oldCapacity = self.capacity;
+    
+    // Allocate new arrays
+    self.capacity = newCapacity;
+    self.count = 0;
+    self.hashes = new u64[newCapacity];
+    self.keys = new K[newCapacity];
+    self.values = new V[newCapacity];
+    self.occupied = new bool[newCapacity];
+    
+    // Initialize new occupied array
+    let i = 0;
+    while (i < newCapacity) {
+      self.occupied[i] = false;
+      i = i + 1;
+    }
+    
+    // Rehash all entries
+    i = 0;
+    while (i < oldCapacity) {
+      if (oldOccupied[i]) {
+        self.$put(oldKeys[i], oldValues[i]);
+      }
+      i = i + 1;
+    }
+  }
+  
+  // Resolve is an alias for get
+  // Note: This is a function (returns value), not a procedure
   pub fn resolve(K key) (V, bool) {
     return self.get(key);
   }
-  
-  // Internal external bindings (not exported)
-  proc $__init() void {}
-  proc $__external_map_put(K key, V value) void {}
-  fn __external_map_get(K key) (V, bool) { 
-    final defaultVal = 0;
-    return (defaultVal, false); 
-  }
-  proc $__external_map_remove(K key) void {}
-  fn __external_map_size() u64 { return 0; }
-  proc $__external_map_clear() void {}
 }
