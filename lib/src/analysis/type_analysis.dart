@@ -4,8 +4,16 @@ import '../ast/ast.dart';
 class PlasmType {
   final String name;
   final List<PlasmType>? typeArguments;
+  final List<PlasmType>? functionParams;
+  final PlasmType? functionReturn;
 
-  PlasmType(this.name, [this.typeArguments]);
+  PlasmType(this.name, [this.typeArguments])
+      : functionParams = null,
+        functionReturn = null;
+
+  PlasmType.function(this.functionParams, this.functionReturn)
+      : name = 'function',
+        typeArguments = null;
 
   static final void_ = PlasmType('void');
   static final any = PlasmType('any');
@@ -116,12 +124,31 @@ class PlasmType {
         }
       }
     }
+
+    // Check function types
+    if (name == 'function') {
+      if (functionParams == null || other.functionParams == null ||
+          functionReturn == null || other.functionReturn == null) {
+        return false;
+      }
+      if (functionParams!.length != other.functionParams!.length) return false;
+      for (int i = 0; i < functionParams!.length; i++) {
+        if (!functionParams![i].isCompatibleWith(other.functionParams![i])) {
+          return false;
+        }
+      }
+      return functionReturn!.isCompatibleWith(other.functionReturn!);
+    }
     
     return true;
   }
 
   @override
   String toString() {
+    if (name == 'function' && functionParams != null && functionReturn != null) {
+      final params = functionParams!.map((t) => t.toString()).join(', ');
+      return '($params) -> ${functionReturn.toString()}';
+    }
     if (typeArguments == null || typeArguments!.isEmpty) {
       return name;
     }
@@ -164,7 +191,9 @@ class TypeAnalyzer implements AstVisitor {
   TypeEnvironment _env;
   final Map<AstNode, PlasmType> _nodeTypes = {};
   final Map<String, PlasmType> _functionReturnTypes = {};
+  final Map<String, Map<String, OperatorDecl>> _classOperators = {}; // className -> {operator -> OperatorDecl}
   PlasmType? _currentFunctionReturnType;
+  String? _currentClassName;
 
   TypeAnalyzer() : _env = TypeEnvironment();
 
@@ -201,6 +230,13 @@ class TypeAnalyzer implements AstVisitor {
   PlasmType _resolveTypeSpec(TypeSpec spec) {
     if (spec.isVoid) return PlasmType.void_;
     if (spec.isAny) return PlasmType.any;
+
+    // Handle function types
+    if (spec.functionParams != null && spec.functionReturn != null) {
+      final params = spec.functionParams!.map((p) => _resolveTypeSpec(p)).toList();
+      final returnType = _resolveTypeSpec(spec.functionReturn!);
+      return PlasmType.function(params, returnType);
+    }
 
     switch (spec.name) {
       case 'u8': return PlasmType.u8;
@@ -294,7 +330,17 @@ class TypeAnalyzer implements AstVisitor {
 
   @override
   void visitClassDecl(ClassDecl node) {
+    _currentClassName = node.name;
+    _classOperators[node.name] = {};
+    
     _enterScope();
+
+    // First pass: collect operators
+    for (final member in node.members) {
+      if (member is OperatorDecl) {
+        _classOperators[node.name]![member.operator] = member;
+      }
+    }
 
     for (final member in node.members) {
       if (member is FieldDecl) {
@@ -318,6 +364,7 @@ class TypeAnalyzer implements AstVisitor {
     }
 
     _exitScope();
+    _currentClassName = null;
   }
 
   @override
@@ -533,6 +580,14 @@ class TypeAnalyzer implements AstVisitor {
       final rightType = _nodeTypes[node.right];
       
       if (leftType != null && rightType != null) {
+        // Check if left type has an operator overload
+        final operatorType = _lookupOperator(leftType, node.operator, rightType);
+        if (operatorType != null) {
+          _setType(node, operatorType);
+          return;
+        }
+
+        // Default operator behavior
         switch (node.operator) {
           case '+':
           case '-':
@@ -603,17 +658,42 @@ class TypeAnalyzer implements AstVisitor {
         arg.accept(this);
       }
       
-      // Look up function return type
-      if (node.callee is IdentifierExpr) {
-        final funcName = (node.callee as IdentifierExpr).name;
-        final returnType = _functionReturnTypes[funcName];
-        if (returnType != null) {
-          _setType(node, returnType);
+      final calleeType = _nodeTypes[node.callee];
+      
+      // Check if callee is a function type (lambda or function pointer)
+      if (calleeType != null && calleeType.name == 'function') {
+        // Validate argument count and types
+        if (calleeType.functionParams != null) {
+          if (node.arguments.length != calleeType.functionParams!.length) {
+            _error('Function call argument count mismatch: expected ${calleeType.functionParams!.length} but got ${node.arguments.length}', 
+                   node.line, node.column);
+          } else {
+            for (int i = 0; i < node.arguments.length; i++) {
+              final argType = _nodeTypes[node.arguments[i]];
+              final paramType = calleeType.functionParams![i];
+              if (argType != null && !argType.isCompatibleWith(paramType)) {
+                _error('Argument type mismatch at position $i: expected $paramType but got $argType', 
+                       node.line, node.column);
+              }
+            }
+          }
+        }
+        
+        // Return the function's return type
+        _setType(node, calleeType.functionReturn ?? PlasmType.void_);
+      } else {
+        // Look up function return type by name
+        if (node.callee is IdentifierExpr) {
+          final funcName = (node.callee as IdentifierExpr).name;
+          final returnType = _functionReturnTypes[funcName];
+          if (returnType != null) {
+            _setType(node, returnType);
+          } else {
+            _setType(node, PlasmType.void_);
+          }
         } else {
           _setType(node, PlasmType.void_);
         }
-      } else {
-        _setType(node, PlasmType.void_);
       }
     } else if (node is MemberAccessExpr) {
       node.object.accept(this);
@@ -660,6 +740,95 @@ class TypeAnalyzer implements AstVisitor {
         }
       }
       _setType(node, PlasmType.string);
+    } else if (node is LambdaExpr) {
+      _enterScope();
+
+      // Process parameters
+      final paramTypes = <PlasmType>[];
+      for (final param in node.parameters) {
+        final paramType = _resolveTypeSpec(param.type);
+        _env.bind(param.name, paramType);
+        _setType(param, paramType);
+        paramTypes.add(paramType);
+      }
+
+      // Process lambda body
+      PlasmType returnType;
+      if (node.body is Expression) {
+        final bodyExpr = node.body as Expression;
+        bodyExpr.accept(this);
+        returnType = _nodeTypes[bodyExpr] ?? PlasmType.void_;
+      } else if (node.body is Block) {
+        final bodyBlock = node.body as Block;
+        // Save current function return type and set it temporarily
+        final savedReturnType = _currentFunctionReturnType;
+        _currentFunctionReturnType = null; // Will be inferred from returns
+        
+        bodyBlock.accept(this);
+        
+        // Try to infer return type from return statements
+        returnType = _currentFunctionReturnType ?? PlasmType.void_;
+        _currentFunctionReturnType = savedReturnType;
+      } else {
+        returnType = PlasmType.void_;
+      }
+
+      _exitScope();
+
+      // Set the lambda's type as a function type
+      final lambdaType = PlasmType.function(paramTypes, returnType);
+      _setType(node, lambdaType);
+    } else if (node is ArrayAllocationExpr) {
+      node.size.accept(this);
+      final elementType = _resolveTypeSpec(node.elementType);
+      // Array type would be represented as Type[]
+      _setType(node, PlasmType('array', [elementType]));
+    } else if (node is ArrayIndexExpr) {
+      node.array.accept(this);
+      node.index.accept(this);
+      
+      final arrayType = _nodeTypes[node.array];
+      if (arrayType != null && arrayType.typeArguments != null && arrayType.typeArguments!.isNotEmpty) {
+        _setType(node, arrayType.typeArguments![0]);
+      } else {
+        _setType(node, PlasmType.any);
+      }
+    } else if (node is ArrayLiteralExpr) {
+      if (node.elements.isEmpty) {
+        _setType(node, PlasmType('array', [PlasmType.any]));
+      } else {
+        node.elements[0].accept(this);
+        final elementType = _nodeTypes[node.elements[0]] ?? PlasmType.any;
+        
+        // Type check all elements
+        for (int i = 1; i < node.elements.length; i++) {
+          node.elements[i].accept(this);
+          final elemType = _nodeTypes[node.elements[i]];
+          if (elemType != null && !elemType.isCompatibleWith(elementType)) {
+            _error('Array element type mismatch: expected $elementType but got $elemType', 
+                   node.line, node.column);
+          }
+        }
+        
+        _setType(node, PlasmType('array', [elementType]));
+      }
     }
+  }
+
+  /// Look up operator overload for a type
+  PlasmType? _lookupOperator(PlasmType leftType, String operator, PlasmType rightType) {
+    // Check if the left type has an operator overload defined
+    final operators = _classOperators[leftType.name];
+    if (operators == null) return null;
+    
+    final operatorDecl = operators[operator];
+    if (operatorDecl == null) return null;
+    
+    // Check if parameter type matches
+    final paramType = _resolveTypeSpec(operatorDecl.parameter.type);
+    if (!rightType.isCompatibleWith(paramType)) return null;
+    
+    // Return the operator's return type
+    return _resolveTypeSpec(operatorDecl.returnType);
   }
 }

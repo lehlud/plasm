@@ -130,9 +130,74 @@ class IrBuilder {
   }
 
   void _buildClassDecl(ClassDecl node) {
-    // Simplified class building
-    // In a full implementation, this would create class metadata,
-    // vtables, etc.
+    // Build class methods and operators
+    for (final member in node.members) {
+      if (member is FunctionDecl) {
+        // Build as a method (with implicit self parameter in the future)
+        _buildFunctionDecl(member);
+      } else if (member is ProcedureDecl) {
+        _buildProcedureDecl(member);
+      } else if (member is OperatorDecl) {
+        _buildOperatorDecl(node.name, member);
+      }
+    }
+  }
+
+  void _buildOperatorDecl(String className, OperatorDecl node) {
+    final returnType = _convertTypeSpec(node.returnType);
+    final parameters = <IrValue>[];
+
+    // Add self parameter (implicit)
+    final selfParam = IrParameter(_nextValueId++, 'self', IrType(className));
+    parameters.add(selfParam);
+
+    // Add the operator parameter
+    final paramType = _convertTypeSpec(node.parameter.type);
+    final irParam = IrParameter(_nextValueId++, node.parameter.name, paramType);
+    parameters.add(irParam);
+
+    // Generate a unique function name for the operator
+    final operatorName = '${className}_op_${_sanitizeOperator(node.operator)}';
+    final function = IrFunction(operatorName, parameters, returnType);
+    _currentFunction = function;
+
+    // Save parameter values
+    _namedValues['self'] = selfParam;
+    _namedValues[node.parameter.name] = irParam;
+
+    // Create entry block
+    final entryBlock = IrBasicBlock(_nextBlockId++, label: 'entry');
+    function.addBlock(entryBlock);
+    _currentBlock = entryBlock;
+
+    // Build operator body
+    _buildBlock(node.body);
+
+    // Clear state
+    _currentFunction = null;
+    _currentBlock = null;
+    _namedValues.remove('self');
+    _namedValues.remove(node.parameter.name);
+
+    module.addFunction(function);
+  }
+
+  String _sanitizeOperator(String op) {
+    // Convert operators to valid identifier characters
+    return op
+        .replaceAll('+', 'add')
+        .replaceAll('-', 'sub')
+        .replaceAll('*', 'mul')
+        .replaceAll('/', 'div')
+        .replaceAll('%', 'mod')
+        .replaceAll('==', 'eq')
+        .replaceAll('!=', 'neq')
+        .replaceAll('<=', 'lte')
+        .replaceAll('>=', 'gte')
+        .replaceAll('<', 'lt')
+        .replaceAll('>', 'gt')
+        .replaceAll('&&', 'and')
+        .replaceAll('||', 'or');
   }
 
   void _buildBlock(Block node) {
@@ -281,6 +346,14 @@ class IrBuilder {
       return _buildAssignmentExpr(expr);
     } else if (expr is CastExpr) {
       return _buildCastExpr(expr);
+    } else if (expr is LambdaExpr) {
+      return _buildLambdaExpr(expr);
+    } else if (expr is ArrayAllocationExpr) {
+      return _buildArrayAllocationExpr(expr);
+    } else if (expr is ArrayIndexExpr) {
+      return _buildArrayIndexExpr(expr);
+    } else if (expr is ArrayLiteralExpr) {
+      return _buildArrayLiteralExpr(expr);
     }
 
     return null;
@@ -318,6 +391,21 @@ class IrBuilder {
     
     if (left == null || right == null) return null;
 
+    // Check if this is an operator overload call
+    final leftType = typeAnalyzer.getType(expr.left);
+    if (leftType != null && !leftType.isNumeric()) {
+      // Try to find operator overload
+      final operatorName = '${leftType.name}_op_${_sanitizeOperator(expr.operator)}';
+      // Check if operator function exists in module
+      final operatorFunc = module.functions.where((f) => f.name == operatorName).firstOrNull;
+      if (operatorFunc != null) {
+        // Call the operator overload
+        final funcRef = IrConstant(_nextValueId++, operatorName, IrType('string'));
+        return _createInstruction(IrOpcode.call, [funcRef, left, right]);
+      }
+    }
+
+    // Default operator behavior
     IrOpcode opcode;
     switch (expr.operator) {
       case '+':
@@ -386,7 +474,23 @@ class IrBuilder {
   }
 
   IrValue? _buildCallExpr(CallExpr expr) {
-    // Handle function calls - callee should be an identifier for function name
+    final args = <IrValue>[];
+    for (final arg in expr.arguments) {
+      final argValue = _buildExpression(arg);
+      if (argValue != null) args.add(argValue);
+    }
+
+    // Check if callee is a lambda or function reference
+    final calleeType = typeAnalyzer.getType(expr.callee);
+    if (calleeType != null && calleeType.name == 'function') {
+      // Indirect call through function reference
+      final callee = _buildExpression(expr.callee);
+      if (callee == null) return null;
+      
+      return _createInstruction(IrOpcode.callIndirect, [callee, ...args]);
+    }
+    
+    // Handle direct function calls by name
     IrValue? callee;
     if (expr.callee is IdentifierExpr) {
       final funcName = (expr.callee as IdentifierExpr).name;
@@ -397,12 +501,6 @@ class IrBuilder {
     }
     
     if (callee == null) return null;
-
-    final args = <IrValue>[];
-    for (final arg in expr.arguments) {
-      final argValue = _buildExpression(arg);
-      if (argValue != null) args.add(argValue);
-    }
 
     return _createInstruction(IrOpcode.call, [callee, ...args]);
   }
@@ -424,6 +522,117 @@ class IrBuilder {
 
     final targetType = _convertTypeSpec(expr.type);
     return _createInstruction(IrOpcode.cast, [value], type: targetType);
+  }
+
+  IrValue? _buildLambdaExpr(LambdaExpr expr) {
+    // Generate a unique name for the lambda function
+    static int lambdaCounter = 0;
+    final lambdaName = '__lambda_${lambdaCounter++}';
+
+    // Save current function and block state
+    final savedFunction = _currentFunction;
+    final savedBlock = _currentBlock;
+    final savedNamedValues = Map<String, IrValue>.from(_namedValues);
+
+    // Build parameters
+    final parameters = <IrValue>[];
+    for (final param in expr.parameters) {
+      final paramType = _convertTypeSpec(param.type);
+      final irParam = IrParameter(_nextValueId++, param.name, paramType);
+      parameters.add(irParam);
+    }
+
+    // Determine return type
+    final exprType = typeAnalyzer.getType(expr);
+    IrType returnType = IrType.void_;
+    if (exprType != null && exprType.name == 'function' && exprType.functionReturn != null) {
+      returnType = _convertType(exprType.functionReturn!);
+    }
+
+    // Create the lambda function
+    final lambdaFunction = IrFunction(lambdaName, parameters, returnType);
+    _currentFunction = lambdaFunction;
+
+    // Clear and bind parameters
+    _namedValues.clear();
+    for (final param in parameters) {
+      _namedValues[param.name!] = param;
+    }
+
+    // Create entry block
+    final entryBlock = IrBasicBlock(_nextBlockId++, label: 'entry');
+    lambdaFunction.addBlock(entryBlock);
+    _currentBlock = entryBlock;
+
+    // Build lambda body
+    if (expr.body is Expression) {
+      final bodyValue = _buildExpression(expr.body as Expression);
+      if (bodyValue != null) {
+        _currentBlock?.setTerminator(
+          IrInstruction(_nextValueId++, IrOpcode.ret, [bodyValue])
+        );
+      }
+    } else if (expr.body is Block) {
+      _buildBlock(expr.body as Block);
+    }
+
+    // Add function to module
+    module.addFunction(lambdaFunction);
+
+    // Restore state
+    _currentFunction = savedFunction;
+    _currentBlock = savedBlock;
+    _namedValues.clear();
+    _namedValues.addAll(savedNamedValues);
+
+    // Return a function reference
+    final funcRef = IrConstant(_nextValueId++, lambdaName, IrType('funcref'));
+    return _createInstruction(IrOpcode.funcRef, [funcRef], type: returnType);
+  }
+
+  IrValue? _buildArrayAllocationExpr(ArrayAllocationExpr expr) {
+    final size = _buildExpression(expr.size);
+    if (size == null) return null;
+
+    final elementType = _convertTypeSpec(expr.elementType);
+    return _createInstruction(IrOpcode.arrayNewDefault, [size], type: IrType('array', [elementType]));
+  }
+
+  IrValue? _buildArrayIndexExpr(ArrayIndexExpr expr) {
+    final array = _buildExpression(expr.array);
+    final index = _buildExpression(expr.index);
+    if (array == null || index == null) return null;
+
+    return _createInstruction(IrOpcode.arrayGet, [array, index], type: array.type);
+  }
+
+  IrValue? _buildArrayLiteralExpr(ArrayLiteralExpr expr) {
+    // For now, create an array and set each element
+    // This is simplified; a full implementation would optimize this
+    if (expr.elements.isEmpty) {
+      return _createInstruction(IrOpcode.arrayNewDefault, 
+        [IrConstant(_nextValueId++, 0, IrType.i32)],
+        type: IrType('array', [IrType.any]));
+    }
+
+    final elements = <IrValue>[];
+    for (final elem in expr.elements) {
+      final value = _buildExpression(elem);
+      if (value != null) elements.add(value);
+    }
+
+    // Create array with size
+    final size = IrConstant(_nextValueId++, expr.elements.length, IrType.i32);
+    final array = _createInstruction(IrOpcode.arrayNewDefault, [size],
+      type: IrType('array', [elements.isNotEmpty ? elements[0].type! : IrType.any]));
+
+    // Set each element (simplified - would need proper array.set calls)
+    for (int i = 0; i < elements.length; i++) {
+      final index = IrConstant(_nextValueId++, i, IrType.i32);
+      _createInstruction(IrOpcode.arraySet, [array, index, elements[i]]);
+    }
+
+    return array;
   }
 
   IrInstruction _createInstruction(IrOpcode opcode, List<IrValue> operands, {IrType? type}) {
